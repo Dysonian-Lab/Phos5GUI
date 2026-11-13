@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './styles/globals.css';
 import { BootSequence } from './components/matrix/BootSequence';
-import { MainLayout } from './components/layout/MainLayout';
+import { MainLayoutShell } from './components/layout/MainLayoutShell';
 import { MatrixRain } from './components/matrix/MatrixRain';
 import { CrtOverlay } from './components/matrix/CrtOverlay';
 import { WizardProvider } from './hooks/WizardProvider';
@@ -18,7 +18,7 @@ function App() {
         <WizardProvider>
           <SettingsProvider>
             <TerminalLogProvider>
-              <MainLayout />
+              <MainLayoutShell />
             </TerminalLogProvider>
           </SettingsProvider>
         </WizardProvider>

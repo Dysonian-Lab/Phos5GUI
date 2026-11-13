@@ -1,7 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useSfx } from '../../hooks/useSfx';
+import type { UiFeatureSet } from '../../utils/featureGating';
 
-export type TabId = 'scan' | 'write' | 'erase' | 'saved' | 'history' | 'settings' | 'advanced';
+export type TabId =
+  | 'scan'
+  | 'write'
+  | 'erase'
+  | 'saved'
+  | 'history'
+  | 'settings'
+  | 'advanced'
+  | 'bwm'
+  | 'cep'
+  | 'fpga'
+  | 'rgb'
+  | 'power'
+  | 'factory'
+  | 'antenna';
 
 interface SidebarProps {
   activeTab: TabId;
@@ -9,16 +24,30 @@ interface SidebarProps {
   deviceName?: string;
   devicePort?: string;
   firmware?: string;
+  /** Whether the connected device is a PM5 (PM5 tabs are hidden otherwise). */
+  isPm5?: boolean;
+  /** Feature gating flags for PM5 panels. */
+  featureSet?: UiFeatureSet;
 }
 
-const TABS: { id: TabId; label: string }[] = [
-    { id: 'scan', label: 'SCAN' },
-    { id: 'write', label: 'WRITE' },
-    { id: 'erase', label: 'ERASE' },
-    { id: 'saved', label: 'SAVED' },
-    { id: 'history', label: 'HISTORY' },
-    { id: 'settings', label: 'SETTINGS' },
-    { id: 'advanced', label: 'ADVANCED' },
+const PM5_TABS: { id: TabId; label: string; requiredFlag?: keyof UiFeatureSet }[] = [
+  { id: 'bwm', label: 'BWM', requiredFlag: 'canAccessBwm' },
+  { id: 'cep', label: 'CEP', requiredFlag: 'canAccessCep' },
+  { id: 'fpga', label: 'FPGA', requiredFlag: 'canAccessFpga' },
+  { id: 'rgb', label: 'RGB LED', requiredFlag: 'canAccessFpga' },
+  { id: 'power', label: 'POWER', requiredFlag: 'canAccessFpga' },
+  { id: 'factory', label: 'FACTORY', requiredFlag: 'canAccessFpga' },
+  { id: 'antenna', label: 'ANTENNA', requiredFlag: 'canAccessFpga' },
+];
+
+const CORE_TABS: { id: TabId; label: string }[] = [
+  { id: 'scan', label: 'SCAN' },
+  { id: 'write', label: 'WRITE' },
+  { id: 'erase', label: 'ERASE' },
+  { id: 'saved', label: 'SAVED' },
+  { id: 'history', label: 'HISTORY' },
+  { id: 'settings', label: 'SETTINGS' },
+  { id: 'advanced', label: 'ADVANCED' },
 ];
 
 const SEPARATOR = '\u2500'.repeat(16); // Unicode box-drawing horizontal line
@@ -36,9 +65,30 @@ function BlinkingCursor() {
   );
 }
 
-export function Sidebar({ activeTab, onTabChange, deviceName, devicePort, firmware }: SidebarProps) {
+export function Sidebar({
+  activeTab,
+  onTabChange,
+  deviceName,
+  devicePort,
+  firmware,
+  isPm5 = false,
+  featureSet,
+}: SidebarProps) {
   const [hoveredTab, setHoveredTab] = useState<TabId | null>(null);
   const sfx = useSfx();
+
+  const tabs = buildAvailableTabs();
+
+  function buildAvailableTabs(): { id: TabId; label: string }[] {
+    const available: { id: TabId; label: string }[] = [...CORE_TABS];
+    if (isPm5) {
+      for (const tab of PM5_TABS) {
+        if (tab.requiredFlag && featureSet?.[tab.requiredFlag] === false) continue;
+        available.push(tab);
+      }
+    }
+    return available;
+  }
 
   return (
     <div
@@ -56,7 +106,7 @@ export function Sidebar({ activeTab, onTabChange, deviceName, devicePort, firmwa
       }}
     >
       <nav style={{ flex: 1 }}>
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const isHovered = hoveredTab === tab.id;
           const prefix = isActive || isHovered ? '>' : '.';

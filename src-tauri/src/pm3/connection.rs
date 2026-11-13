@@ -11,6 +11,7 @@ use tokio::time::timeout;
 use crate::error::AppError;
 use crate::logging;
 use crate::pm3::output_parser::strip_ansi;
+use crate::probe::ng_protocol::{probe_device_capabilities, ProbeMethod, ProbeResult};
 
 /// Payload emitted as `pm3-output` events for the live terminal panel.
 #[derive(Debug, Clone, Serialize)]
@@ -157,6 +158,14 @@ fn pm3_scope_names() -> Vec<&'static str> {
 static PORT_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(COM[1-9]\d*|/dev/tty(ACM|USB)\d{1,2}|/dev/tty\.usbmodem\w+)$")
         .expect("bad port regex")
+});
+
+/// Regex to extract device and client capability versions from the mismatch error.
+/// Matches: "Capabilities structure version sent by Proxmark3 is not the one expected by this client! (v13 != v11)"
+/// Group 1 = device version, Group 2 = client version.
+static CAPABILITIES_MISMATCH_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"Capabilities structure version sent by Proxmark3 is not the one expected by this client! \(v(\d+) != v(\d+)\)")
+        .expect("bad capabilities mismatch regex")
 });
 
 /// Internal PM3 execution that does NOT emit to the frontend.
@@ -526,6 +535,20 @@ fn pm3_error_line(output: &str) -> Option<String> {
             .into_iter()
             .find(|tag| t.starts_with(tag) && t.len() > tag.len())
             .map(|tag| t[tag.len()..].trim().to_string())
+    })
+}
+
+/// Parse a capabilities version mismatch from PM3 stderr output.
+///
+/// Matches the error:
+/// "Capabilities structure version sent by Proxmark3 is not the one expected by this client! (v13 != v11)"
+///
+/// Returns (device_version, client_version) as u8 values.
+fn parse_capabilities_mismatch(stderr: &str) -> Option<(u8, u8)> {
+    CAPABILITIES_MISMATCH_RE.captures(stderr).map(|caps| {
+        let device_ver = caps[1].parse::<u8>().unwrap_or(0);
+        let client_ver = caps[2].parse::<u8>().unwrap_or(0);
+        (device_ver, client_ver)
     })
 }
 
@@ -1292,6 +1315,109 @@ async fn probe_port(app: &AppHandle, port: &str) -> Result<String, AppError> {
     // so the error message is the most user-recognizable one.
     Err(first_spawn_error.unwrap_or_else(|| {
         AppError::CommandFailed("Failed to spawn proxmark3: binary not found".into())
+    }))
+}
+
+/// Probe device capabilities using Layer 1 (direct serial) with Layer 2 (stderr scraping) fallback.
+///
+/// This is the primary capability detection function that should be called before
+/// spawning any `proxmark3.exe` process. It returns detailed capability information
+/// including the device's CAPABILITIES_VERSION, which enables version mediation.
+///
+/// Layer 1: Direct serial probe via NG frames (CMD_PING + CMD_CAPABILITIES)
+/// Layer 2: Fallback to stderr scraping from failed `proxmark3.exe` connection attempt
+///
+/// Returns a ProbeResult with the detection method used.
+pub async fn probe_device_with_fallback(
+    app: &AppHandle,
+    port: &str,
+    baudrate: u32,
+) -> Result<ProbeResult, AppError> {
+    // Layer 1: Direct serial probe
+    match probe_device_capabilities(port, baudrate).await {
+        Ok(result) => {
+            emit_output(app, &format!("[+] Layer 1 probe succeeded: device capabilities v{}", result.capabilities_version), false);
+            return Ok(result);
+        }
+        Err(e) => {
+            emit_output(app, &format!("[=] Layer 1 probe failed: {}. Trying Layer 2...", e), false);
+        }
+    }
+
+    // Layer 2: Spawn bundled client and capture stderr for capabilities mismatch
+    let scope_names = pm3_scope_names();
+    let mut first_spawn_error: Option<AppError> = None;
+
+    for scope_name in &scope_names {
+        let output_future = app
+            .shell()
+            .command(scope_name)
+            .args(["-p", port, "-f", "-c", "hw version"])
+            .output();
+
+        let output = match timeout(DETECT_TIMEOUT, output_future).await {
+            Err(_) => {
+                return Err(AppError::Timeout(format!(
+                    "Port {} timed out during Layer 2 probe",
+                    port
+                )));
+            }
+            Ok(Err(e)) => {
+                if first_spawn_error.is_none() {
+                    first_spawn_error = Some(AppError::CommandFailed(format!(
+                        "Failed to spawn proxmark3: {}",
+                        e
+                    )));
+                }
+                continue;
+            }
+            Ok(Ok(output)) => output,
+        };
+
+        let code = output.status.code().unwrap_or(-1);
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+        // If hw version succeeded (exit code 0), parse normally
+        if code == 0 {
+            let _cleaned = strip_ansi(&stdout);
+            // We can't extract capabilities_version from hw version output directly,
+            // but we know the device is compatible with the client.
+            return Ok(ProbeResult {
+                capabilities_version: 0, // Unknown from hw version alone
+                capabilities: None,
+                max_cmd_data_size: 512,
+                is_pm5: false,
+                method: ProbeMethod::StderrScraping,
+            });
+        }
+
+        // Check for capabilities mismatch in stderr
+        if let Some((device_ver, client_ver)) = parse_capabilities_mismatch(&stderr) {
+            emit_output(app, &format!("[+] Layer 2 probe succeeded via stderr: device v{}, client v{}", device_ver, client_ver), false);
+            return Ok(ProbeResult {
+                capabilities_version: device_ver,
+                capabilities: None,
+                max_cmd_data_size: 512,
+                is_pm5: device_ver >= 11, // PM5 features start around v11
+                method: ProbeMethod::StderrScraping,
+            });
+        }
+
+        // Other error
+        let detail = if stderr.is_empty() {
+            strip_ansi(&stdout)
+        } else {
+            strip_ansi(&stderr)
+        };
+        return Err(AppError::CommandFailed(with_detail(
+            friendly_exit_code(code, "hw version"),
+            &detail,
+        )));
+    }
+
+    Err(first_spawn_error.unwrap_or_else(|| {
+        AppError::CommandFailed("Failed to spawn proxmark3 for Layer 2 probe: binary not found".into())
     }))
 }
 

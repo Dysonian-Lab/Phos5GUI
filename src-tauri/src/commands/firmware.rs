@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex};
 
 use regex::Regex;
@@ -6,8 +7,13 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_shell::ShellExt;
 
 use crate::error::AppError;
+use crate::flasher;
 use crate::pm3::connection;
 use crate::pm3::version::parse_detailed_hw_version;
+use crate::pm5::capabilities::{
+    evaluate_capabilities, VersionMatchStatus, CLIENT_CAPABILITIES_VERSION,
+};
+use crate::probe::ng_protocol::ProbeMethod;
 
 // ---------------------------------------------------------------------------
 // State — holds the running flash child process (if any) for cancellation
@@ -38,6 +44,10 @@ pub struct FirmwareCheckResult {
     pub device_firmware_version: String,
     pub hardware_variant: String,
     pub firmware_path_exists: bool,
+    pub probe_method: ProbeMethod,
+    pub capabilities_version: u8,
+    pub max_cmd_data_size: u16,
+    pub is_pm5: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -63,42 +73,133 @@ static PORT_RE: LazyLock<Regex> = LazyLock::new(|| {
 // Commands
 // ---------------------------------------------------------------------------
 
+/// Probe device capabilities and evaluate version match against the bundled client.
+#[tauri::command]
+pub async fn evaluate_version_match(
+    app: AppHandle,
+    port: String,
+) -> Result<VersionMatchStatus, String> {
+    let probe_result = connection::probe_device_with_fallback(&app, &port, 9600)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(evaluate_capabilities(
+        probe_result.capabilities_version,
+        CLIENT_CAPABILITIES_VERSION,
+    ))
+}
+
+/// Flash PM5 firmware (bootrom + fullimage) for the requested variant via USB-CDC flasher.
+#[tauri::command]
+pub async fn flash_pm5_firmware(
+    app: AppHandle,
+    port: String,
+    variant: String,
+) -> Result<(), String> {
+    if !PORT_RE.is_match(&port) {
+        return Err(format!("Invalid port: {}", port));
+    }
+
+    let variant = variant.to_lowercase();
+    if variant != "standard" && variant != "bwm" {
+        return Err(format!(
+            "Invalid PM5 variant '{}'. Expected 'standard' or 'bwm'.",
+            variant
+        ));
+    }
+
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|e| format!("Failed to resolve resource dir: {}", e))?;
+
+    let candidates = [
+        resource_dir.join("firmware").join("pm5").join(&variant),
+        resource_dir.join("firmware").join(&variant),
+    ];
+
+    let (bootrom_path, fullimage_path) = candidates
+        .iter()
+        .find_map(|base| {
+            let bootrom = base.join("bootrom.elf");
+            let fullimage = base.join("fullimage.elf");
+            if bootrom.exists() && fullimage.exists() {
+                Some((bootrom, fullimage))
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| {
+            format!(
+                "Bundled PM5 firmware not found for variant '{}'. Expected bootrom.elf and fullimage.elf.",
+                variant
+            )
+        })?;
+
+    let bootrom_path: PathBuf = strip_win_prefix(bootrom_path);
+    let fullimage_path: PathBuf = strip_win_prefix(fullimage_path);
+
+    flasher::bootloader::flash_via_client_flasher(&port, &bootrom_path, &fullimage_path)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+fn strip_win_prefix(path: PathBuf) -> PathBuf {
+    let s = path.to_string_lossy();
+    if let Some(stripped) = s.strip_prefix(r"\\?\") {
+        PathBuf::from(stripped)
+    } else {
+        path
+    }
+}
+
 /// Check firmware version match between bundled client and device OS.
-/// Called after detect_device succeeds — runs `hw version` and parses it.
+/// Uses Layer 1 direct serial probe (NG frames) with Layer 2 stderr scraping fallback.
+/// This runs BEFORE any proxmark3.exe spawn to get capabilities even on mismatch.
 #[tauri::command]
 pub async fn check_firmware_version(
     app: AppHandle,
     port: String,
 ) -> Result<FirmwareCheckResult, AppError> {
-    let output = match connection::run_command(&app, &port, "hw version").await {
-        Ok(out) => out,
+    // Probe device capabilities using layered approach (Layer 1 + Layer 2 fallback)
+    let probe_result = connection::probe_device_with_fallback(&app, &port, 9600).await?;
+
+    // Now try to get detailed hw version info via the client
+    let hw_info = match connection::run_command(&app, &port, "hw version").await {
+        Ok(output) => {
+            let info = parse_detailed_hw_version(&output);
+            Some(info)
+        }
         Err(e) => {
-            // Capabilities mismatch — PM3 client refuses to run commands because
-            // the device firmware doesn't match. We can't parse hw version output,
-            // but we know it's mismatched. Try to find a bundled firmware variant.
+            // If hw version fails, we still have probe data
             let err_msg = e.to_string();
             if err_msg.to_lowercase().contains("capabilities") {
-                return Ok(FirmwareCheckResult {
-                    matched: false,
-                    client_version: "bundled".to_string(),
-                    device_firmware_version: "incompatible".to_string(),
-                    hardware_variant: "unknown".to_string(),
-                    firmware_path_exists: false,
-                });
+                None // Mismatch but we have probe data
+            } else {
+                return Err(e);
             }
-            return Err(e);
         }
     };
-    let info = parse_detailed_hw_version(&output);
 
-    let fw_exists = firmware_file_exists(&app, &info.hardware_variant);
+    let (matched, client_version, device_firmware_version, hardware_variant) = if let Some(info) = hw_info {
+        (info.versions_match, info.client_version, info.os_version, info.hardware_variant)
+    } else {
+        // No hw version output, use probe data
+        (false, "bundled".to_string(), format!("v{}", probe_result.capabilities_version), "pm5".to_string())
+    };
+
+    let fw_exists = firmware_file_exists(&app, &hardware_variant);
 
     Ok(FirmwareCheckResult {
-        matched: info.versions_match,
-        client_version: info.client_version,
-        device_firmware_version: info.os_version,
-        hardware_variant: info.hardware_variant,
+        matched,
+        client_version,
+        device_firmware_version,
+        hardware_variant,
         firmware_path_exists: fw_exists,
+        probe_method: probe_result.method,
+        capabilities_version: probe_result.capabilities_version,
+        max_cmd_data_size: probe_result.max_cmd_data_size,
+        is_pm5: probe_result.is_pm5,
     })
 }
 

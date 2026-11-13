@@ -20,6 +20,7 @@ pub mod mad;
 pub mod mf;
 pub mod mfu;
 pub mod nfc;
+pub mod pm5;
 pub mod thinfilm;
 pub mod raw;
 pub mod saved;
