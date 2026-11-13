@@ -1,0 +1,30 @@
+{
+  "capabilities_version": 13,
+  "commit_hash": "0000000000000000000000000000000000000000",
+  "build_date": "2026-01-01T00:00:00Z",
+  "variants": {
+    "standard": {
+      "firmware_path": "firmware/pm5/standard/fullimage.elf",
+      "features": {
+        "compiled_with_bwm": false,
+        "compiled_with_cep": true,
+        "is_pm5_std_ant": true,
+        "hw_available_fpga_flash": true,
+        "hw_available_i2c_eeprom": true
+      }
+    },
+    "bwm": {
+      "firmware_path": "firmware/pm5/bwm/fullimage.elf",
+      "features": {
+        "compiled_with_bwm": true,
+        "compiled_with_cep": true,
+        "is_pm5_std_ant": false,
+        "hw_available_fpga_flash": true,
+        "hw_available_i2c_eeprom": true
+      }
+    }
+  },
+  "patched_client": true,
+  "min_client_version": "4.23346",
+  "max_client_version": "4.23346"
+}

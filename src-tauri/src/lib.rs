@@ -12,7 +12,7 @@ mod state;
 use std::sync::Mutex;
 
 use commands::firmware::FlashState;
-use pm3::connection::HfOperationState;
+use pm3::connection::{HfOperationState, ManagedPm5Session};
 use state::WizardMachine;
 use tauri::Manager;
 
@@ -79,6 +79,7 @@ pub fn run() {
             app.manage(Mutex::new(WizardMachine::new()));
             app.manage(FlashState::new());
             app.manage(HfOperationState::new());
+            app.manage(ManagedPm5Session::new());
             // Open the session diagnostic log and write the environment header.
             //
             // This replaces a startup marker that wrote to a HARDCODED developer
@@ -126,6 +127,9 @@ pub fn run() {
               commands::pm5::set_power_rail,
               commands::pm5::get_factory_info,
               commands::pm5::get_antenna_status,
+              commands::pm5::pm5_session_start,
+              commands::pm5::pm5_session_send,
+              commands::pm5::pm5_session_stop,
               commands::erase::detect_chip,
               commands::erase::wipe_chip,
               commands::saved::save_card,

@@ -7,7 +7,6 @@ use tokio::time::sleep;
 
 use crate::error::AppError;
 use crate::flasher::client_flasher;
-use crate::pm3::connection;
 use crate::pm5::bwm::parse_battery_status;
 use crate::pm5::fpga::parse_fpga_status;
 use crate::probe::ng_protocol;
@@ -181,36 +180,67 @@ async fn flash_mcu(
     }
 }
 
-async fn load_fpga_bitstream(app: &AppHandle, port: &str) -> String {
-    // PM5 FPGA bitstream load command varies by client build; try common forms.
-    let candidates = [
-        "hw fpga load",
-        "fpga load",
-        "hw fpga flash",
-    ];
-
-    let mut last_err: Option<String> = None;
-    for cmd in candidates {
-        emit(app, "fpga", 70, format!("Attempting FPGA bitstream load: `{}`", cmd));
-        match connection::run_command(app, port, cmd).await {
-            Ok(out) => {
-                let lower = out.to_lowercase();
-                if lower.contains("error") || lower.contains("failed") || lower.contains("[!!]") {
-                    last_err = Some(format!("`{}` reported error output", cmd));
-                    continue;
-                }
-                return format!("FPGA bitstream load command executed: `{}`", cmd);
-            }
-            Err(e) => {
-                last_err = Some(format!("`{}` failed: {}", cmd, e));
+/// Locate a PM5 FPGA bitstream shipped alongside the firmware.
+fn find_fpga_bitstream(app: &AppHandle) -> Option<PathBuf> {
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    if let Ok(res) = app.path().resource_dir() {
+        dirs.push(res.join("firmware").join("pm5").join("bwm"));
+        dirs.push(res.join("firmware").join("pm5"));
+        dirs.push(res.join("firmware"));
+    }
+    let names = ["fpga_bitstream.bin", "fpga.bin", "bitstream.bin"];
+    for dir in dirs {
+        for name in names {
+            let candidate = dir.join(name);
+            if candidate.is_file() {
+                return Some(candidate);
             }
         }
     }
+    None
+}
 
-    format!(
-        "FPGA bitstream load step completed with warnings ({}). Verification will confirm FPGA state.",
-        last_err.unwrap_or_else(|| "no compatible FPGA load command found".to_string())
-    )
+/// Load the FPGA bitstream via the concrete CMD_FPGA_BITSTREAM_LOAD NG frame
+/// (Plan Section 8.1 / 12) instead of guessing client CLI strings.
+async fn load_fpga_bitstream(app: &AppHandle, port: &str) -> String {
+    match find_fpga_bitstream(app) {
+        Some(path) => {
+            let bytes = match std::fs::read(&path) {
+                Ok(b) => b,
+                Err(e) => {
+                    return format!(
+                        "FPGA bitstream load skipped: failed to read {}: {e}",
+                        path.display()
+                    );
+                }
+            };
+            emit(
+                app,
+                "fpga",
+                70,
+                format!(
+                    "Loading FPGA bitstream ({} bytes) via CMD_FPGA_BITSTREAM_LOAD",
+                    bytes.len()
+                ),
+            );
+            match ng_protocol::load_fpga_bitstream_raw(port, 115200, &bytes).await {
+                Ok(_) => format!("FPGA bitstream loaded via NG frame ({} bytes).", bytes.len()),
+                Err(e) => format!(
+                    "FPGA bitstream load failed: {e}. Verification will confirm FPGA state."
+                ),
+            }
+        }
+        None => {
+            emit(
+                app,
+                "fpga",
+                70,
+                "No FPGA bitstream file found in the firmware directory.",
+            );
+            "FPGA bitstream load skipped: no bitstream file found. Verification will confirm FPGA state."
+                .to_string()
+        }
+    }
 }
 
 async fn verify_pm5_state(port: &str) -> Result<String, AppError> {

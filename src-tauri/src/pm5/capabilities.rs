@@ -28,6 +28,68 @@ pub enum VersionMatchStatus {
 /// Expected capabilities version of the bundled/patched PM5 client.
 pub const CLIENT_CAPABILITIES_VERSION: u8 = 13;
 
+/// A single firmware variant's feature flags (Plan Section 4.4).
+#[derive(Debug, Clone, Deserialize)]
+pub struct VariantFeatures {
+    pub compiled_with_bwm: bool,
+    pub compiled_with_cep: bool,
+    pub is_pm5_std_ant: bool,
+    pub hw_available_fpga_flash: bool,
+    pub hw_available_i2c_eeprom: bool,
+}
+
+/// One firmware variant entry in the capabilities manifest.
+#[derive(Debug, Clone, Deserialize)]
+pub struct VariantManifest {
+    pub firmware_path: String,
+    pub features: VariantFeatures,
+}
+
+/// The capabilities manifest schema (Plan Section 4.4).
+#[derive(Debug, Clone, Deserialize)]
+pub struct CapabilitiesManifest {
+    pub capabilities_version: u8,
+    pub commit_hash: String,
+    pub build_date: String,
+    pub variants: std::collections::HashMap<String, VariantManifest>,
+    pub patched_client: bool,
+    pub min_client_version: String,
+    pub max_client_version: String,
+}
+
+/// The manifest compiled into the binary from `src-tauri/capabilities/pm5.json`.
+pub const PM5_MANIFEST_JSON: &str = include_str!("../../capabilities/pm5.json");
+
+/// Parse the compiled-in capabilities manifest.
+pub fn load_manifest() -> Result<CapabilitiesManifest, String> {
+    serde_json::from_str(PM5_MANIFEST_JSON)
+        .map_err(|e| format!("Invalid capabilities/pm5.json manifest: {e}"))
+}
+
+/// The capabilities version declared by the manifest, if it parses.
+pub fn manifest_capabilities_version() -> Option<u8> {
+    load_manifest().ok().map(|m| m.capabilities_version)
+}
+
+/// Validate that the manifest is internally consistent with this client.
+///
+/// Checks that the declared capabilities version matches
+/// [`CLIENT_CAPABILITIES_VERSION`] and that both required variants exist.
+pub fn validate_manifest(manifest: &CapabilitiesManifest) -> Result<(), String> {
+    if manifest.capabilities_version != CLIENT_CAPABILITIES_VERSION {
+        return Err(format!(
+            "Manifest capabilities_version {} does not match client {}",
+            manifest.capabilities_version, CLIENT_CAPABILITIES_VERSION
+        ));
+    }
+    for variant in ["standard", "bwm"] {
+        if !manifest.variants.contains_key(variant) {
+            return Err(format!("Manifest is missing the '{variant}' variant"));
+        }
+    }
+    Ok(())
+}
+
 /// Evaluate the relationship between a probed device version and the
 /// client's expected version.
 ///
@@ -68,7 +130,10 @@ pub fn evaluate_capabilities(device_ver: u8, client_ver: u8) -> VersionMatchStat
 
 #[cfg(test)]
 mod tests {
-    use super::{evaluate_capabilities, VersionMatchStatus};
+    use super::{
+        evaluate_capabilities, load_manifest, manifest_capabilities_version, validate_manifest,
+        VersionMatchStatus,
+    };
     use serde_json::json;
 
     #[test]
@@ -161,5 +226,25 @@ mod tests {
                 "detail": { "reason": "timeout" }
             })
         );
+    }
+
+    #[test]
+    fn manifest_matches_client_version_and_variants() {
+        let manifest = load_manifest().expect("pm5.json should parse");
+        assert_eq!(manifest.capabilities_version, 13);
+        assert_eq!(manifest_capabilities_version(), Some(13));
+        validate_manifest(&manifest).expect("manifest should validate against this client");
+
+        let standard = manifest
+            .variants
+            .get("standard")
+            .expect("standard variant present");
+        assert!(!standard.features.compiled_with_bwm);
+        assert!(standard.features.compiled_with_cep);
+        assert!(standard.features.is_pm5_std_ant);
+
+        let bwm = manifest.variants.get("bwm").expect("bwm variant present");
+        assert!(bwm.features.compiled_with_bwm);
+        assert!(bwm.features.compiled_with_cep);
     }
 }

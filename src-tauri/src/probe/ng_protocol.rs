@@ -23,7 +23,12 @@ static SERIAL_PORT_LOCKS: LazyLock<Mutex<HashMap<String, Arc<AsyncMutex<()>>>>> 
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Retrieve (or create) the async mutex guarding direct serial access to `port`.
-fn port_serial_lock(port: &str) -> Arc<AsyncMutex<()>> {
+///
+/// This is the single source of truth for port serialisation: both direct serial
+/// NG queries and `proxmark3.exe` process spawns in `pm3::connection` acquire the
+/// lock returned here, so a client spawn and a raw serial query can never touch
+/// the same COM port at once (Windows `ERROR_ACCESS_DENIED`).
+pub fn port_serial_lock(port: &str) -> Arc<AsyncMutex<()>> {
     let mut map = SERIAL_PORT_LOCKS.lock().expect("serial port lock map poisoned");
     map.entry(port.to_string())
         .or_insert_with(|| Arc::new(AsyncMutex::new(())))
@@ -53,6 +58,12 @@ const CMD_PM5_BWM_GET_BATTERY: u16 = 0x0184;
 const CMD_CEP_STATUS: u16 = 0x0185;
 /// CMD_FPGA_STATUS — returns PM5 FPGA management status.
 const CMD_FPGA_STATUS: u16 = 0x0501;
+/// CMD_FPGA_BITSTREAM_LOAD — load a bitstream into the PM5 FPGA (0x0501 family).
+///
+/// The PM5 FPGA management opcode block is `0x0501..0x0503` (Section 8.1). The
+/// bitstream load opcode is exposed here so `pm5_provision` can push a concrete
+/// bitstream frame instead of guessing client CLI strings.
+pub const CMD_FPGA_BITSTREAM_LOAD: u16 = 0x0501;
 /// CMD_PM5_POWER_GET_STATUS — returns PM5 power rail telemetry.
 const CMD_PM5_POWER_GET_STATUS: u16 = 0x0170;
 /// CMD_PM5_POWER_SET_RAIL — enables/disables a PM5 power rail.
@@ -436,6 +447,71 @@ pub async fn query_fpga_status_raw(port: &str, baudrate: u32) -> Result<Vec<u8>,
     Ok(result?)
 }
 
+/// Build the NG frame that loads an FPGA bitstream (CMD_FPGA_BITSTREAM_LOAD).
+///
+/// The whole bitstream is carried as the frame payload. Bitstreams larger than
+/// the 15-bit NG payload limit are rejected by `load_fpga_bitstream_raw` rather
+/// than silently truncated.
+pub fn build_fpga_bitstream_frame(bitstream: &[u8]) -> Vec<u8> {
+    build_ng_frame(CMD_FPGA_BITSTREAM_LOAD, bitstream)
+}
+
+/// Load an FPGA bitstream into the PM5 device via CMD_FPGA_BITSTREAM_LOAD.
+///
+/// Sends the raw NG frame carrying the bitstream bytes and returns the response
+/// payload. Acquires the shared per-port serial lock so this cannot race a
+/// client process spawn or another serial query on the same port.
+pub async fn load_fpga_bitstream_raw(
+    port: &str,
+    baudrate: u32,
+    bitstream: &[u8],
+) -> Result<Vec<u8>, AppError> {
+    if bitstream.is_empty() {
+        return Err(AppError::CommandFailed("FPGA bitstream is empty".into()));
+    }
+    if bitstream.len() > MAX_PAYLOAD_LEN {
+        return Err(AppError::CommandFailed(format!(
+            "FPGA bitstream is {} bytes, exceeding the single-frame NG payload limit of {} bytes",
+            bitstream.len(),
+            MAX_PAYLOAD_LEN
+        )));
+    }
+
+    let lock = port_serial_lock(port);
+    let _guard = lock.lock().await;
+    let port = port.to_string();
+    let bitstream = bitstream.to_vec();
+    let result = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, AppError> {
+        let mut sp = serialport::new(&port, baudrate)
+            .timeout(Duration::from_secs(10))
+            .open()
+            .map_err(|e| {
+                AppError::CommandFailed(format!("Failed to open serial port {port}: {e}"))
+            })?;
+
+        let frame = build_fpga_bitstream_frame(&bitstream);
+        sp.write_all(&frame).map_err(|e| {
+            AppError::CommandFailed(format!("Failed to write CMD_FPGA_BITSTREAM_LOAD: {e}"))
+        })?;
+
+        let resp = read_ng_response(&mut *sp)?;
+        if resp.status != 0 {
+            return Err(AppError::CommandFailed(format!(
+                "CMD_FPGA_BITSTREAM_LOAD rejected with status {} reason {}",
+                resp.status, resp.reason
+            )));
+        }
+
+        drop(sp);
+        Ok(resp.data)
+    })
+    .await
+    .map_err(|e| AppError::CommandFailed(format!("FPGA bitstream load task failed: {e}")))?;
+
+    sleep(Duration::from_millis(150)).await;
+    result
+}
+
 /// Query PM5 RGB LED status via direct serial NG command.
 /// Sends CMD_PM5_RGB_GET_STATUS (0x0182) and returns the raw response payload.
 /// Releases the port with a short delay to avoid Windows COM handle contention.
@@ -664,5 +740,46 @@ pub async fn query_antenna_status_raw(port: &str, baudrate: u32) -> Result<Vec<u
 
     sleep(Duration::from_millis(150)).await;
     Ok(result?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fpga_bitstream_frame_has_correct_header_and_payload() {
+        let frame = build_fpga_bitstream_frame(&[0xAA, 0xBB]);
+
+        assert_eq!(&frame[0..4], &REQUEST_MAGIC.to_le_bytes());
+        let len_ng = u16::from_le_bytes([frame[4], frame[5]]);
+        assert_eq!(len_ng & 0x7FFF, 2);
+        assert_eq!(len_ng & NG_FLAG, NG_FLAG);
+        assert_eq!(
+            u16::from_le_bytes([frame[6], frame[7]]),
+            CMD_FPGA_BITSTREAM_LOAD
+        );
+        assert_eq!(&frame[8..10], &[0xAA, 0xBB]);
+        assert_eq!(
+            u16::from_le_bytes([frame[10], frame[11]]),
+            crc16(&frame[..10])
+        );
+    }
+
+    #[test]
+    fn fpga_bitstream_frame_empty_payload() {
+        let frame = build_fpga_bitstream_frame(&[]);
+        let len_ng = u16::from_le_bytes([frame[4], frame[5]]);
+        assert_eq!(len_ng & 0x7FFF, 0);
+        assert_eq!(frame.len(), COMMAND_PREAMBLE_LEN + POSTAMBLE_LEN);
+    }
+
+    #[test]
+    fn port_serial_lock_is_keyed_per_port() {
+        let a1 = port_serial_lock("COM1");
+        let a2 = port_serial_lock("COM1");
+        let b = port_serial_lock("COM2");
+        assert!(Arc::ptr_eq(&a1, &a2));
+        assert!(!Arc::ptr_eq(&a1, &b));
+    }
 }
 

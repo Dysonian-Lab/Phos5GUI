@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+use std::process::Stdio;
 use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
 
@@ -6,12 +8,16 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::process::{Child, ChildStdin};
 use tokio::time::timeout;
 
 use crate::error::AppError;
 use crate::logging;
 use crate::pm3::output_parser::strip_ansi;
-use crate::probe::ng_protocol::{probe_device_capabilities, ProbeMethod, ProbeResult};
+use crate::probe::ng_protocol::{
+    port_serial_lock, probe_device_capabilities, ProbeMethod, ProbeResult,
+};
 
 /// Payload emitted as `pm3-output` events for the live terminal panel.
 #[derive(Debug, Clone, Serialize)]
@@ -59,30 +65,30 @@ pub fn emit_output(app: &AppHandle, text: &str, is_error: bool) {
 /// Maximum time to wait for a PM3 subprocess to complete (30 seconds).
 const PM3_COMMAND_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Serialises every PM3 subprocess spawn.
+/// Serialises access to a single COM port across every PM3 entry point.
 ///
 /// Only one `proxmark3.exe` may hold a COM port at a time; a second process
-/// fails to open it and reports "invalid serial port". The `WizardMachine`
-/// mutex does NOT cover this: it guards the finite-state machine's port string
-/// and is released *before* the subprocess spawns, so two overlapping Tauri
-/// invocations used to race straight into two simultaneous spawns. The
-/// `raw` command module exposes arbitrary PM3 commands to the webview, which
-/// makes this reachable deliberately, not just by accident.
+/// fails to open it and reports "invalid serial port". This is the SAME per-port
+/// lock used by the direct serial NG queries in `probe::ng_protocol`, so a raw
+/// serial query and a client spawn can never touch the same port concurrently
+/// (Windows `ERROR_ACCESS_DENIED`). Keying by port also lets unrelated ports run
+/// in parallel instead of serialising the whole machine.
 ///
-/// The guard is taken in `execute_pm3` and `probe_port` only -- those are the
-/// outermost spawn entry points. Taking it in `run_binary_direct` as well
-/// would deadlock, since `try_sidecar_silent` calls it from inside
-/// `execute_pm3`.
-static PM3_PORT_LOCK: LazyLock<tokio::sync::Mutex<()>> =
-    LazyLock::new(|| tokio::sync::Mutex::new(()));
-
-/// Acquire the serialisation guard, bounded so a stuck probe sweep cannot block
-/// the UI indefinitely.
-async fn acquire_port_lock(wait: Duration) -> Result<tokio::sync::MutexGuard<'static, ()>, AppError> {
-    match timeout(wait, PM3_PORT_LOCK.lock()).await {
+/// The guard is acquired by the outermost spawn/query entry points:
+/// `execute_pm3` (scope-name spawns), `run_binary_direct` (bundled sidecar),
+/// `probe_port`, `probe_device_with_fallback` (Layer 2), `run_command_streaming`
+/// and the interactive session. `run_binary_direct` is only reached from
+/// `execute_pm3`'s sidecar attempt, which does NOT hold the guard itself, so the
+/// two acquisitions never nest and cannot deadlock.
+async fn acquire_port_lock(
+    port: &str,
+    wait: Duration,
+) -> Result<tokio::sync::OwnedMutexGuard<()>, AppError> {
+    let lock = port_serial_lock(port);
+    match timeout(wait, lock.lock_owned()).await {
         Ok(guard) => Ok(guard),
         Err(_) => Err(AppError::CommandFailed(
-            "Another PM3 operation is still running. Wait for it to finish, then try again.".into(),
+            "Another PM3 operation is still using this port. Wait for it to finish, then try again.".into(),
         )),
     }
 }
@@ -298,10 +304,9 @@ async fn execute_pm3(
     }
 
 
-    // One PM3 process at a time per machine. Held for the whole spawn so a
-    // concurrent invocation cannot open the same COM port.
-    let _port_guard = acquire_port_lock(wait).await?;
-
+    // One PM3 process at a time per port. The sidecar path locks per-port inside
+    // `run_binary_direct`; the scope-name spawns below lock per-port around each
+    // spawn. Neither nests, so the shared `port_serial_lock` cannot deadlock.
     // Start the clock BEFORE the binary lookup so the logged duration includes
     // spawn overhead. Without this a "slow" command and a "hung" command look
     // identical in the log.
@@ -327,6 +332,11 @@ async fn execute_pm3(
     let mut first_spawn_error: Option<AppError> = None;
 
     for scope_name in &scope_names {
+        // Serialise this port with direct serial queries and the sidecar path.
+        // Held across the spawn so a concurrent command cannot open the same COM
+        // port mid-spawn.
+        let _port_guard = acquire_port_lock(port, wait).await?;
+
         let output_future = app
             .shell()
             .command(scope_name)
@@ -924,6 +934,245 @@ impl HfOperationState {
 }
 
 // ---------------------------------------------------------------------------
+// Persistent interactive PM3 session (Plan Section 7)
+// ---------------------------------------------------------------------------
+
+/// Prompt the PM3 interactive client prints before reading each command.
+const PM3_PROMPT: &str = "pm3 -->";
+
+/// How long to wait for the client to print its initial prompt after spawn.
+const PM3_SESSION_PROMPT_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// A long-lived `proxmark3.exe <port>` interactive session.
+///
+/// Unlike the one-shot `execute_pm3` path (a fresh process per command), this
+/// keeps a single client process alive so the device's internal state (detected
+/// modulation, card select, etc.) survives between commands. stdin/stdout/stderr
+/// are piped; `send_interactive_command` writes a command and reads until the
+/// next `pm3 -->` prompt.
+pub struct Pm5Session {
+    child: Child,
+    stdin: ChildStdin,
+    reader: BufReader<tokio::process::ChildStdout>,
+    buffer: String,
+}
+
+/// Validate an interactive command (no embedded newlines that could inject a
+/// second command). Pure so it can be unit-tested without spawning a process.
+fn validate_interactive_command(cmd: &str) -> Result<(), AppError> {
+    if cmd.contains('\n') || cmd.contains('\r') {
+        return Err(AppError::CommandFailed(
+            "Invalid characters in command".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Resolve the bundled `proxmark3` binary for interactive sessions, mirroring the
+/// lookup used by the one-shot path. Falls back to `None` so the caller can rely
+/// on PATH.
+fn resolve_pm3_binary() -> Option<PathBuf> {
+    let exe_name = if cfg!(target_os = "windows") {
+        "proxmark3.exe"
+    } else {
+        "proxmark3"
+    };
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            for candidate in [
+                dir.join(exe_name),
+                dir.join("binaries").join(exe_name),
+                dir.join("binaries").join("proxmark3").join(exe_name),
+            ] {
+                if candidate.is_file() {
+                    return Some(candidate);
+                }
+            }
+        }
+    }
+    None
+}
+
+impl Pm5Session {
+    /// Read from the client until it prints the `pm3 -->` prompt (or `wait`
+    /// elapses). Appends everything read to `self.buffer`.
+    async fn wait_for_prompt(&mut self, wait: Duration) -> Result<(), AppError> {
+        let mut chunk = [0u8; 1024];
+        loop {
+            let n = match timeout(wait, self.reader.read(&mut chunk)).await {
+                Ok(Ok(n)) => n,
+                Ok(Err(e)) => {
+                    return Err(AppError::CommandFailed(format!(
+                        "PM3 session read failed: {e}"
+                    )))
+                }
+                Err(_) => {
+                    return Err(AppError::Timeout(
+                        "Timed out waiting for the PM3 prompt".into(),
+                    ))
+                }
+            };
+            if n == 0 {
+                return Err(AppError::CommandFailed(
+                    "PM3 session closed unexpectedly".into(),
+                ));
+            }
+            self.buffer.push_str(&String::from_utf8_lossy(&chunk[..n]));
+            if self.buffer.contains(PM3_PROMPT) {
+                return Ok(());
+            }
+        }
+    }
+
+    /// Terminate the underlying client process.
+    pub async fn stop(mut self) {
+        let _ = self.child.kill().await;
+    }
+}
+
+/// Spawn a persistent interactive `proxmark3.exe <port>` session and wait for the
+/// initial prompt. The caller is responsible for holding the per-port lock across
+/// the spawn (see `ManagedPm5Session::start`).
+pub async fn start_persistent_session(port: &str) -> Result<Pm5Session, AppError> {
+    if !PORT_RE.is_match(port) {
+        return Err(AppError::CommandFailed(format!("Invalid port: {port}")));
+    }
+
+    let exe_name = if cfg!(target_os = "windows") {
+        "proxmark3.exe"
+    } else {
+        "proxmark3"
+    };
+    let program = resolve_pm3_binary().unwrap_or_else(|| PathBuf::from(exe_name));
+
+    let mut cmd = tokio::process::Command::new(&program);
+    cmd.arg(port)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    #[cfg(target_os = "windows")]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        // tokio::process::Command exposes `creation_flags` on Windows directly.
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    let mut child = cmd.spawn().map_err(|e| {
+        AppError::CommandFailed(format!("Failed to spawn {}: {e}", program.display()))
+    })?;
+
+    let stdin = child.stdin.take().ok_or_else(|| {
+        AppError::CommandFailed("PM3 session stdin unavailable".into())
+    })?;
+    let stdout = child.stdout.take().ok_or_else(|| {
+        AppError::CommandFailed("PM3 session stdout unavailable".into())
+    })?;
+
+    // Drain stderr in the background so the child never blocks on a full pipe;
+    // mirror it to the session log.
+    if let Some(stderr) = child.stderr.take() {
+        tokio::spawn(async move {
+            let mut lines = BufReader::new(stderr).lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                logging::line(&format!("[pm3-session] {line}"));
+            }
+        });
+    }
+
+    let mut session = Pm5Session {
+        child,
+        stdin,
+        reader: BufReader::new(stdout),
+        buffer: String::new(),
+    };
+    session.wait_for_prompt(PM3_SESSION_PROMPT_TIMEOUT).await?;
+    Ok(session)
+}
+
+/// Send one command to an interactive session and return its output (without the
+/// trailing prompt).
+pub async fn send_interactive_command(
+    session: &mut Pm5Session,
+    cmd: &str,
+) -> Result<String, AppError> {
+    validate_interactive_command(cmd)?;
+
+    session.buffer.clear();
+    session
+        .stdin
+        .write_all(cmd.as_bytes())
+        .await
+        .map_err(|e| AppError::CommandFailed(format!("PM3 session write failed: {e}")))?;
+    session
+        .stdin
+        .write_all(b"\n")
+        .await
+        .map_err(|e| AppError::CommandFailed(format!("PM3 session write failed: {e}")))?;
+    session
+        .stdin
+        .flush()
+        .await
+        .map_err(|e| AppError::CommandFailed(format!("PM3 session flush failed: {e}")))?;
+
+    session.wait_for_prompt(PM3_COMMAND_TIMEOUT).await?;
+
+    let raw = std::mem::take(&mut session.buffer);
+    Ok(raw.replace(PM3_PROMPT, "").trim().to_string())
+}
+
+/// Thread-safe managed interactive session exposed via Tauri application state.
+///
+/// Holds at most one `Pm5Session`. `start` takes the shared per-port lock while
+/// spawning (so it cannot race a direct serial query or another spawn), and
+/// `send` serialises commands through the inner async mutex.
+pub struct ManagedPm5Session {
+    session: tokio::sync::Mutex<Option<Pm5Session>>,
+}
+
+impl ManagedPm5Session {
+    pub fn new() -> Self {
+        Self {
+            session: tokio::sync::Mutex::new(None),
+        }
+    }
+
+    /// Start (or replace) the interactive session for `port`.
+    pub async fn start(&self, port: &str) -> Result<(), AppError> {
+        let _port_guard = acquire_port_lock(port, PM3_COMMAND_TIMEOUT).await?;
+        let session = start_persistent_session(port).await?;
+        let mut guard = self.session.lock().await;
+        if let Some(old) = guard.take() {
+            old.stop().await;
+        }
+        *guard = Some(session);
+        Ok(())
+    }
+
+    /// Send a command to the active session.
+    pub async fn send(&self, cmd: &str) -> Result<String, AppError> {
+        let mut guard = self.session.lock().await;
+        let session = guard.as_mut().ok_or_else(|| {
+            AppError::CommandFailed("No active PM5 session. Start one first.".into())
+        })?;
+        send_interactive_command(session, cmd).await
+    }
+
+    /// Terminate the active session, if any.
+    pub async fn stop(&self) {
+        if let Some(session) = self.session.lock().await.take() {
+            session.stop().await;
+        }
+    }
+}
+
+impl Default for ManagedPm5Session {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Streaming command execution (HF operations)
 // ---------------------------------------------------------------------------
 
@@ -961,6 +1210,11 @@ where
     }
 
     emit_output(app, &format!("pm3 --> {}", cmd), false);
+
+    // Serialise this port with direct serial queries and one-shot command
+    // execution. Held across the spawn and the whole stream read so a concurrent
+    // command cannot open the same COM port while this child is running.
+    let _port_guard = acquire_port_lock(port, Duration::from_secs(timeout_secs)).await?;
 
     // Try sidecar first, then scope names — same strategy as execute_pm3()
     let (rx, child) = spawn_pm3(app, port, cmd)?;
@@ -1159,10 +1413,10 @@ where
 pub async fn detect_device(app: &AppHandle) -> Result<(String, String, String), AppError> {
     let candidates = build_port_candidates();
 
-    // Probe sweeps spawn many short-lived clients, so they must exclude command
-    // execution for the duration -- otherwise a probe can collide with a real
-    // command on the same port.
-    let _port_guard = acquire_port_lock(Duration::from_secs(120)).await?;
+    // Probe sweeps spawn many short-lived clients. Each `probe_port` call now
+    // takes the per-port lock for the specific port it probes, so a probe of one
+    // port cannot collide with a command on that same port, while probes of
+    // different ports run in parallel. No machine-wide lock is needed here.
 
     // Pick a random init message for personality
     let init_msgs = [
@@ -1254,6 +1508,11 @@ pub async fn detect_device(app: &AppHandle) -> Result<(String, String, String), 
 /// Uses DETECT_TIMEOUT (3s) instead of the full PM3_COMMAND_TIMEOUT (30s)
 /// so scanning 40 COM ports completes quickly.
 async fn probe_port(app: &AppHandle, port: &str) -> Result<String, AppError> {
+    // Probe the port under the same per-port lock used by command execution and
+    // direct serial queries. `detect_device` no longer holds a global lock, so a
+    // probe of COM5 does not block a command on COM4.
+    let _port_guard = acquire_port_lock(port, DETECT_TIMEOUT).await?;
+
     let scope_names = pm3_scope_names();
     let mut first_spawn_error: Option<AppError> = None;
 
@@ -1345,6 +1604,10 @@ pub async fn probe_device_with_fallback(
     }
 
     // Layer 2: Spawn bundled client and capture stderr for capabilities mismatch
+    // The Layer 1 probe above already released the per-port lock; take it again so
+    // the fallback client spawn shares the exact same lock as direct serial I/O.
+    let _port_guard = acquire_port_lock(port, DETECT_TIMEOUT).await?;
+
     let scope_names = pm3_scope_names();
     let mut first_spawn_error: Option<AppError> = None;
 
@@ -1538,6 +1801,11 @@ async fn run_binary_direct(
     cmd: &str,
     wait: Duration,
 ) -> Result<String, AppError> {
+    // Share the per-port lock with direct serial NG queries and the scope-name
+    // spawn path. This function is only reached from `execute_pm3`'s sidecar
+    // attempt, which does not hold the guard, so this acquisition never nests.
+    let _port_guard = acquire_port_lock(port, wait).await?;
+
     // On Windows, use std::process::Command with CREATE_NO_WINDOW to suppress console popups
     // tokio's Command doesn't expose creation_flags, so we use std::process and wrap for async
     #[cfg(target_os = "windows")]
@@ -1813,7 +2081,15 @@ fn extract_short_version(version_str: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{friendly_exit_code, interpret_pm3_result, is_banner_only, is_card_dependent, is_safe_pm3_command_chain, is_t55xx_memory_cmd, pm3_error_line, rejected_command};
+    use super::{friendly_exit_code, interpret_pm3_result, is_banner_only, is_card_dependent, is_safe_pm3_command_chain, is_t55xx_memory_cmd, pm3_error_line, rejected_command, validate_interactive_command};
+
+    #[test]
+    fn interactive_command_rejects_embedded_newlines() {
+        assert!(validate_interactive_command("hw version").is_ok());
+        assert!(validate_interactive_command("lf t55xx detect").is_ok());
+        assert!(validate_interactive_command("hw version\nlf search").is_err());
+        assert!(validate_interactive_command("hw version\r\n").is_err());
+    }
 
     /// Verbatim PM3 output for `lf t55xx danger raw`. Exit code 0.
     #[test]

@@ -1,4 +1,5 @@
 use crate::flasher;
+use crate::pm3::connection::ManagedPm5Session;
 use crate::pm5::bwm::{parse_battery_status, BwmBatteryStatus};
 use crate::pm5::cep::{parse_cep_status, CepStatus};
 use crate::pm5::fpga::{parse_fpga_status, FpgaStatus};
@@ -6,7 +7,7 @@ use crate::pm5::hardware::{parse_antenna_status, parse_factory_info, AntennaStat
 use crate::pm5::rgb_power::{parse_power_status, parse_rgb_status, PowerStatus, RgbStatus};
 use crate::pm5::update_pipeline::{self, UpdateCheckResult};
 use crate::probe::ng_protocol;
-use tauri::AppHandle;
+use tauri::{AppHandle, State};
 
 /// Query PM5 BWM battery telemetry (CMD_PM5_BWM_GET_BATTERY, opcode 0x0184).
 ///
@@ -190,5 +191,30 @@ pub async fn execute_pm5_update(app: AppHandle, port: String) -> Result<String, 
     update_pipeline::execute_update_pipeline(app, port)
         .await
         .map_err(|e| e.to_string())
+}
+
+/// Start (or replace) a persistent interactive PM3 session on `port`.
+#[tauri::command]
+pub async fn pm5_session_start(
+    state: State<'_, ManagedPm5Session>,
+    port: String,
+) -> Result<(), String> {
+    state.start(&port).await.map_err(|e| e.to_string())
+}
+
+/// Send one command to the active interactive PM3 session and return its output.
+#[tauri::command]
+pub async fn pm5_session_send(
+    state: State<'_, ManagedPm5Session>,
+    cmd: String,
+) -> Result<String, String> {
+    state.send(&cmd).await.map_err(|e| e.to_string())
+}
+
+/// Terminate the active interactive PM3 session, if any.
+#[tauri::command]
+pub async fn pm5_session_stop(state: State<'_, ManagedPm5Session>) -> Result<(), String> {
+    state.stop().await;
+    Ok(())
 }
 
