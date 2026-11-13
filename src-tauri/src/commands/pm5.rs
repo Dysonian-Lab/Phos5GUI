@@ -4,6 +4,7 @@ use crate::pm5::cep::{parse_cep_status, CepStatus};
 use crate::pm5::fpga::{parse_fpga_status, FpgaStatus};
 use crate::pm5::hardware::{parse_antenna_status, parse_factory_info, AntennaStatus, FactoryInfo};
 use crate::pm5::rgb_power::{parse_power_status, parse_rgb_status, PowerStatus, RgbStatus};
+use crate::pm5::update_pipeline::{self, UpdateCheckResult};
 use crate::probe::ng_protocol;
 use tauri::AppHandle;
 
@@ -165,6 +166,28 @@ pub async fn flash_pm5_complete(
     variant: String,
 ) -> Result<String, String> {
     flasher::pm5_provision(&app, &port, &variant)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Check the independent sandbox for upstream PM5 commits ahead of local HEAD.
+///
+/// Runs `git fetch origin master` inside `.build-env/pm3-src` and compares
+/// `HEAD` against `origin/master`, returning the commit diff and changelog.
+#[tauri::command]
+pub async fn check_pm5_updates(app: AppHandle) -> Result<UpdateCheckResult, String> {
+    update_pipeline::check_updates(&app)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Run the full 1-click upstream update & flash pipeline for the PM5.
+///
+/// Emits `pm5-update-progress` events at every stage (merge, patch, firmware
+/// compile, client compile, hot-swap, flash). Returns the provisioning summary.
+#[tauri::command]
+pub async fn execute_pm5_update(app: AppHandle, port: String) -> Result<String, String> {
+    update_pipeline::execute_update_pipeline(app, port)
         .await
         .map_err(|e| e.to_string())
 }

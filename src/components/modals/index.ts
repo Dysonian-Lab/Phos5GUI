@@ -6,3 +6,11 @@ export type { OutdatedDesktopClientModalProps } from './OutdatedDesktopClientMod
 
 export { VersionMismatchModal } from './VersionMismatchModal';
 export type { VersionMismatchModalProps, VersionMatchStatus } from './VersionMismatchModal';
+
+export { Pm5UpdateModal } from './Pm5UpdateModal';
+export type {
+  Pm5UpdateModalProps,
+  UpdateCheckResult,
+  UpdateProgressPayload,
+  PipelineStatusString,
+} from './Pm5UpdateModal';

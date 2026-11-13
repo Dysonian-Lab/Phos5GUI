@@ -5,6 +5,7 @@ import { useSettings } from '../../hooks/useSettings';
 import { useSfx } from '../../hooks/useSfx';
 import { useWizard } from '../../hooks/useWizard';
 import { TerminalPanel } from '../shared/TerminalPanel';
+import { Pm5UpdateModal } from '../modals';
 
 type FlashProgressPayload = {
   stage: string;
@@ -21,6 +22,7 @@ export function SettingsView() {
   const [progress, setProgress] = useState<FlashProgressPayload | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
 
   useEffect(() => {
     let unlisten: UnlistenFn | null = null;
@@ -69,7 +71,8 @@ export function SettingsView() {
   const pct = Math.max(0, Math.min(100, progress?.percent ?? 0));
 
   return (
-    <TerminalPanel title="SETTINGS">
+    <>
+      <TerminalPanel title="SETTINGS">
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div>
           <div style={{ color: 'var(--green-mid)', fontSize: '13px', fontWeight: 600 }}>
@@ -129,6 +132,26 @@ export function SettingsView() {
             >
               {isProvisioning ? 'Provisioning...' : 'Flash / Provision Device'}
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                sfx.click();
+                setIsUpdateModalOpen(true);
+              }}
+              style={{
+                background: 'var(--bg-void)',
+                color: 'var(--amber, #FFB800)',
+                border: '2px solid var(--amber, #FFB800)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '12px',
+                fontWeight: 600,
+                padding: '6px 14px',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+              }}
+            >
+              Check for Updates
+            </button>
             <span style={{ color: 'var(--green-dim)', fontSize: '11px' }}>
               PORT: {wizard.context.port ?? '---'}
             </span>
@@ -160,6 +183,12 @@ export function SettingsView() {
           )}
         </div>
       </div>
-    </TerminalPanel>
+      </TerminalPanel>
+      <Pm5UpdateModal
+        isOpen={isUpdateModalOpen}
+        port={wizard.context.port ?? ''}
+        onClose={() => setIsUpdateModalOpen(false)}
+      />
+    </>
   );
 }
