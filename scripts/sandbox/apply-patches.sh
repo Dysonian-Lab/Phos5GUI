@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SANDBOX_ROOT="$PROJECT_ROOT/.build-env"
 PM3_SRC="$SANDBOX_ROOT/pm3-src"
-PATCH_FILE="$SANDBOX_ROOT/patches/comms_relaxed_version.patch"
+PATCH_FILE="$PROJECT_ROOT/src-tauri/src/client_patch/comms_relaxed_version.patch"
 
 cd "$PM3_SRC"
 

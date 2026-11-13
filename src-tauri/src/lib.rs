@@ -114,6 +114,7 @@ pub fn run() {
               commands::firmware::flash_firmware,
               commands::firmware::flash_pm5_firmware,
               commands::firmware::cancel_flash,
+              commands::pm5::flash_pm5_complete,
               commands::pm5::get_bwm_battery_status,
               commands::pm5::get_cep_status,
               commands::pm5::get_fpga_status,

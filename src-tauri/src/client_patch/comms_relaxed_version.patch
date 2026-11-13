@@ -1,0 +1,35 @@
+diff --git a/client/src/comms.c b/client/src/comms.c
+index xxxxxxx..yyyyyyy 100644
+--- a/client/src/comms.c
++++ b/client/src/comms.c
+@@ -939,11 +939,18 @@ int GetCapabilities(uint8_t *buffer, size_t len)
+     }
+ 
+-    if ((resp.length != sizeof(g_pm3_capabilities)) ||
+-        (resp.data.asBytes[0] != CAPABILITIES_VERSION)) {
+-        PrintAndLogEx(ERR, "Capabilities structure version sent by Proxmark3 is not the one expected by this client! (v%u != v%u)");
+-        return PM3_EDEVNOTSUPP;
+-    }
++    if ((resp.length != sizeof(g_pm3_capabilities)) ||
++        (resp.data.asBytes[0] != CAPABILITIES_VERSION)) {
++        PrintAndLogEx(WARNING, _YELLOW_("Capabilities version mismatch: device v%u, client v%u. Continuing anyway..."),
++                      resp.data.asBytes[0], CAPABILITIES_VERSION);
++        /* DO NOT RETURN PM3_EDEVNOTSUPP -- copy what we can and continue */
++        size_t copy_len = MIN(resp.length, sizeof(g_pm3_capabilities));
++        memcpy(&g_pm3_capabilities, resp.data.asBytes, copy_len);
++        /* Zero out unknown fields */
++        if (copy_len < sizeof(g_pm3_capabilities)) {
++            memset(((uint8_t*)&g_pm3_capabilities) + copy_len, 0,
++                   sizeof(g_pm3_capabilities) - copy_len);
++        }
++    }
+ 
+     /* If we got here we have a valid response. Copy it. */
+-    memcpy(&g_pm3_capabilities, resp.data.asBytes, sizeof(g_pm3_capabilities));
++    /* Capabilities already copied above in mismatch case; only copy on exact match */
++    if (resp.length == sizeof(g_pm3_capabilities) && resp.data.asBytes[0] == CAPABILITIES_VERSION) {
++        memcpy(&g_pm3_capabilities, resp.data.asBytes, sizeof(g_pm3_capabilities));
++    }
+ 
+     return PM3_SUCCESS;
+ }

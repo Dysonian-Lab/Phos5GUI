@@ -4391,7 +4391,7 @@ mod tests {
     /// printed "Valid iCLASS tag / PicoPass tag found".
     #[test]
     fn parse_hf_search_real_iclass_output() {
-        let output = "[+] loaded `D:/kilocode/Phosphor-debug/Phosphor2.2GUI/portable/.proxmark3/preferences.json`\n[+] execute command from commandline: hf search\n\n[+] Using UART port COM24\n[+] Communicating with PM3 over USB-CDC\n[+] Max frame size: 624 bytes\n[+] Emulator memory: 8192 bytes\n[usb|script] pm3 --> hf search\n\n[+] iCLASS / Picopass CSN: EF 82 06 03 F8 FF 12 E0 \n\n[+] Valid iCLASS tag / PicoPass tag found\n\n[?] Hint: Try `hf iclass` commands\n\n";
+        let output = "[+] loaded `C:/pm3/.proxmark3/preferences.json`\n[+] execute command from commandline: hf search\n\n[+] Using UART port COM24\n[+] Communicating with PM3 over USB-CDC\n[+] Max frame size: 624 bytes\n[+] Emulator memory: 8192 bytes\n[usb|script] pm3 --> hf search\n\n[+] iCLASS / Picopass CSN: EF 82 06 03 F8 FF 12 E0 \n\n[+] Valid iCLASS tag / PicoPass tag found\n\n[?] Hint: Try `hf iclass` commands\n\n";
         let (card_type, data) = parse_hf_search(output).expect("iCLASS should be detected");
         assert_eq!(card_type, CardType::IClass);
         assert_eq!(data.uid, "EF820603F8FF12E0");

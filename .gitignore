@@ -46,3 +46,6 @@ output.txt
 
 # Locally staged release artifacts (binaries/installer zips) - published via GitHub Releases
 release/
+
+# PhosSpace sandbox: seeded toolchain, PM3 source clone, and build artifacts
+.build-env/

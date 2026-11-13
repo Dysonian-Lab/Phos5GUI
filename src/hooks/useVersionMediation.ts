@@ -1,14 +1,22 @@
 import { useCallback, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { VersionMatchStatus } from '../components/modals';
 
 export type Pm5FirmwareVariant = 'standard' | 'bwm';
+
+export interface FlashProgressPayload {
+  stage: string;
+  percent: number;
+  message: string;
+}
 
 export interface UseVersionMediationReturn {
   status: VersionMatchStatus | null;
   isOpen: boolean;
   isProcessing: boolean;
   errorMessage: string | null;
+  flashProgress: FlashProgressPayload | null;
   checkVersion: (port: string) => Promise<VersionMatchStatus | null>;
   handleUpdateFirmware: (port: string, variant?: Pm5FirmwareVariant) => Promise<void>;
   handleCompatibilityMode: () => void;
@@ -40,6 +48,7 @@ export function useVersionMediation(): UseVersionMediationReturn {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [flashProgress, setFlashProgress] = useState<FlashProgressPayload | null>(null);
 
   const closeModal = useCallback(() => {
     setIsOpen(false);
@@ -77,15 +86,26 @@ export function useVersionMediation(): UseVersionMediationReturn {
   }, []);
 
   const handleUpdateFirmware = useCallback(
-    async (port: string, variant: Pm5FirmwareVariant = 'standard'): Promise<void> => {
+    async (port: string, variant: Pm5FirmwareVariant = 'bwm'): Promise<void> => {
       setIsProcessing(true);
       setErrorMessage(null);
+      setFlashProgress({ stage: 'start', percent: 0, message: 'Starting PM5 provisioning...' });
+      let unlisten: UnlistenFn | null = null;
       try {
-        await invoke<void>('flash_pm5_firmware', { port, variant });
+        unlisten = await listen<FlashProgressPayload>('flash-progress', (event) => {
+          setFlashProgress(event.payload);
+        });
+        await invoke<string>('flash_pm5_complete', { port, variant });
+        setFlashProgress((prev) =>
+          prev ?? { stage: 'done', percent: 100, message: 'Provisioning complete.' },
+        );
         setIsOpen(false);
       } catch (error) {
         setErrorMessage(getErrorMessage(error));
       } finally {
+        if (unlisten) {
+          unlisten();
+        }
         setIsProcessing(false);
       }
     },
@@ -122,6 +142,7 @@ export function useVersionMediation(): UseVersionMediationReturn {
     isOpen,
     isProcessing,
     errorMessage,
+    flashProgress,
     checkVersion,
     handleUpdateFirmware,
     handleCompatibilityMode,

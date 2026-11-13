@@ -33,7 +33,14 @@ export function MainLayoutShell() {
   const [activeTab, setActiveTab] = useState<TabId>('scan');
   const { enabled: musicEnabled, toggle: toggleMusic } = useMusic();
   const wizard = useWizard();
-  const { status: versionStatus, checkVersion } = useVersionMediation();
+  const {
+    status: versionStatus,
+    checkVersion,
+    isProcessing: isProvisioning,
+    flashProgress,
+    errorMessage: provisionError,
+    handleUpdateFirmware,
+  } = useVersionMediation();
 
   // B1: Derive PM3 connection status from wizard step
   const connected = wizard.currentStep !== 'Idle' && wizard.currentStep !== 'DetectingDevice';
@@ -229,12 +236,16 @@ export function MainLayoutShell() {
               deviceVer={device_ver}
               clientVer={client_ver}
               isOpen
-              onClose={() => setIsModalDismissed(true)}
+              isProcessing={isProvisioning}
+              progress={flashProgress}
+              errorMessage={provisionError}
+              onClose={() => !isProvisioning && setIsModalDismissed(true)}
               onUpdateFirmware={() => {
-                void wizard.updateFirmware();
-                setIsModalDismissed(true);
+                if (wizard.context.port) {
+                  void handleUpdateFirmware(wizard.context.port, 'bwm');
+                }
               }}
-              onCompatibilityMode={() => setIsModalDismissed(true)}
+              onCompatibilityMode={() => !isProvisioning && setIsModalDismissed(true)}
             />
           );
         }
@@ -260,8 +271,15 @@ export function MainLayoutShell() {
             <VersionMismatchModal
               status={versionStatus}
               isOpen
+              isProcessing={isProvisioning}
+              progress={flashProgress}
+              errorMessage={provisionError}
               onClose={() => setIsModalDismissed(true)}
-              onUpdateFirmware={() => setIsModalDismissed(true)}
+              onUpdateFirmware={() => {
+                if (wizard.context.port) {
+                  void handleUpdateFirmware(wizard.context.port, 'bwm');
+                }
+              }}
               onCompatibilityMode={() => setIsModalDismissed(true)}
               onUseLocalClient={() => setIsModalDismissed(true)}
               onRebuildClient={() => setIsModalDismissed(true)}

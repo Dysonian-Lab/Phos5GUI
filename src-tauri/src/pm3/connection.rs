@@ -1858,10 +1858,10 @@ dump             Dump MIFARE Classic tag to binary file\n";
     /// produces. That is how `is_banner_only` shipped returning false against
     /// real output while its own test passed. Do not "tidy" this constant --
     /// re-copy it from a real log instead.
-    const BANNER_ONLY: &str = "[=] Session log D:/kilocode/Phosphor-debug/Phosphor2.2GUI/portable/.proxmark3/logs/log_20260930155228.txt\n\
+    const BANNER_ONLY: &str = "[=] Session log C:/pm3/.proxmark3/logs/log_20260930155228.txt\n\
 [=] Output will be flushed after every print.\n\
 \n\
-[+] loaded `D:/kilocode/Phosphor-debug/Phosphor2.2GUI/portable/.proxmark3/preferences.json`\n\
+[+] loaded `C:/pm3/.proxmark3/preferences.json`\n\
 [+] execute command from commandline: hf 14a info\n\
 \n\
 [+] Using UART port COM19\n\

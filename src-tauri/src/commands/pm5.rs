@@ -1,9 +1,11 @@
+use crate::flasher;
 use crate::pm5::bwm::{parse_battery_status, BwmBatteryStatus};
 use crate::pm5::cep::{parse_cep_status, CepStatus};
 use crate::pm5::fpga::{parse_fpga_status, FpgaStatus};
 use crate::pm5::hardware::{parse_antenna_status, parse_factory_info, AntennaStatus, FactoryInfo};
 use crate::pm5::rgb_power::{parse_power_status, parse_rgb_status, PowerStatus, RgbStatus};
 use crate::probe::ng_protocol;
+use tauri::AppHandle;
 
 /// Query PM5 BWM battery telemetry (CMD_PM5_BWM_GET_BATTERY, opcode 0x0184).
 ///
@@ -152,5 +154,18 @@ pub async fn get_antenna_status(port: String) -> Result<AntennaStatus, String> {
             raw.len()
         )
     })
+}
+
+/// Run the complete PM5 provisioning pipeline (bootloader -> MCU flash -> FPGA -> verify).
+/// Emits `flash-progress` events with stage/percent/message updates.
+#[tauri::command]
+pub async fn flash_pm5_complete(
+    app: AppHandle,
+    port: String,
+    variant: String,
+) -> Result<String, String> {
+    flasher::pm5_provision(&app, &port, &variant)
+        .await
+        .map_err(|e| e.to_string())
 }
 

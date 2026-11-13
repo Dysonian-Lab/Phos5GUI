@@ -245,6 +245,10 @@ pub fn read_ng_response(port: &mut dyn SerialPort) -> Result<NgResponse, AppErro
 /// handle is explicitly dropped and a 150 ms delay is inserted before returning,
 /// otherwise Tauri spawning `proxmark3.exe` fails with `ERROR_ACCESS_DENIED`.
 pub async fn probe_device_capabilities(port: &str, baudrate: u32) -> Result<ProbeResult, AppError> {
+    // Serialize direct serial access per port to avoid COM handle collisions.
+    let lock = port_serial_lock(port);
+    let _guard = lock.lock().await;
+
     // Own the port string so the `'static` `spawn_blocking` closure can move it in.
     let port = port.to_string();
     let result = tokio::task::spawn_blocking(move || -> Result<ProbeResult, AppError> {
@@ -311,7 +315,8 @@ pub async fn probe_device_capabilities(port: &str, baudrate: u32) -> Result<Prob
     .map_err(|e| AppError::CommandFailed(format!("Probe task failed: {e}")))?;
 
     // 8. CRITICAL: brief delay to let Windows release the port handle fully
-    //    before Tauri spawns proxmark3.exe.
+    //    before Tauri spawns proxmark3.exe. Keep the per-port lock held through
+    //    this settle window to prevent probe collisions.
     sleep(Duration::from_millis(150)).await;
 
     Ok(result?)

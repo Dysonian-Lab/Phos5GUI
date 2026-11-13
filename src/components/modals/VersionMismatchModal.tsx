@@ -1,4 +1,4 @@
-import { OutdatedDeviceFirmwareModal } from './OutdatedDeviceFirmwareModal';
+import { OutdatedDeviceFirmwareModal, type FlashProgressPayload } from './OutdatedDeviceFirmwareModal';
 import { OutdatedDesktopClientModal } from './OutdatedDesktopClientModal';
 
 export type VersionMatchStatus =
@@ -10,6 +10,9 @@ export type VersionMatchStatus =
 export interface VersionMismatchModalProps {
   status: VersionMatchStatus | null;
   isOpen: boolean;
+  isProcessing?: boolean;
+  progress?: FlashProgressPayload | null;
+  errorMessage?: string | null;
   onClose: () => void;
   onUpdateFirmware: () => void;
   onCompatibilityMode: () => void;
@@ -22,6 +25,9 @@ export interface VersionMismatchModalProps {
 export function VersionMismatchModal({
   status,
   isOpen,
+  isProcessing = false,
+  progress = null,
+  errorMessage = null,
   onClose,
   onUpdateFirmware,
   onCompatibilityMode,
@@ -40,6 +46,9 @@ export function VersionMismatchModal({
         deviceVer={device_ver}
         clientVer={client_ver}
         isOpen={isOpen}
+        isProcessing={isProcessing}
+        progress={progress}
+        errorMessage={errorMessage}
         onClose={onClose}
         onUpdateFirmware={onUpdateFirmware}
         onCompatibilityMode={onCompatibilityMode}
