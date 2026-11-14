@@ -50,3 +50,7 @@ release/
 
 # PhosSpace sandbox: seeded toolchain, PM3 source clone, and build artifacts
 .build-env/
+
+cargo-test-lib*.txt
+cargo-test-lib*.out
+cargo-check-release.txt
