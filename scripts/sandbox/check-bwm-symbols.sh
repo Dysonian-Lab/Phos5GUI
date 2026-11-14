@@ -1,0 +1,18 @@
+#!/bin/bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+TOOLCHAIN="$PROJECT_ROOT/.build-env/toolchain"
+export PATH="$TOOLCHAIN/usr/bin:$TOOLCHAIN/mingw64/bin:$TOOLCHAIN/opt/arm-none-eabi/bin:$PATH"
+FW="$PROJECT_ROOT/src-tauri/firmware/pm5"
+echo "=== Standard firmware BWM symbols ==="
+arm-none-eabi-nm "$FW/standard/fullimage.elf" | grep -i bwm || echo "No BWM symbols found in standard"
+echo ""
+echo "=== BWM firmware BWM symbols ==="
+arm-none-eabi-nm "$FW/bwm/fullimage.elf" | grep -i bwm || echo "No BWM symbols found in BWM"
+echo ""
+echo "=== Standard firmware bwm_ symbols ==="
+arm-none-eabi-nm "$FW/standard/fullimage.elf" | grep "bwm_" || echo "No bwm_ symbols in standard"
+echo ""
+echo "=== BWM firmware bwm_ symbols ==="
+arm-none-eabi-nm "$FW/bwm/fullimage.elf" | grep "bwm_" || echo "No bwm_ symbols in BWM"

@@ -4,7 +4,7 @@ set -euo pipefail
 # Apply the relaxed capabilities-version client patch into the PhosSpace PM3
 # source sandbox.
 #
-# Patches are applied in .build-env/pm3-src/ only; no host ProxSpace tree
+# Patches are applied in .build-env/pm3-src/ only; no host toolchain tree
 # is read, written, or locked.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

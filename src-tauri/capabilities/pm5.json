@@ -1,7 +1,7 @@
 {
   "capabilities_version": 13,
-  "commit_hash": "0000000000000000000000000000000000000000",
-  "build_date": "2026-01-01T00:00:00Z",
+  "commit_hash": "32252289222fc6c8974117506ccb487fe5ef5bd6",
+  "build_date": "2026-11-13T18:04:49Z",
   "variants": {
     "standard": {
       "firmware_path": "firmware/pm5/standard/fullimage.elf",
@@ -18,7 +18,7 @@
       "features": {
         "compiled_with_bwm": true,
         "compiled_with_cep": true,
-        "is_pm5_std_ant": false,
+        "is_pm5_std_ant": true,
         "hw_available_fpga_flash": true,
         "hw_available_i2c_eeprom": true
       }

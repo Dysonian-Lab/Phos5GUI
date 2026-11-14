@@ -4,7 +4,7 @@
     .build-env\toolchain\ on first build (Section 14.1).
 
 .DESCRIPTION
-    Phos5GUI must be completely autonomous: no ProxSpace install, no
+    Phos5GUI must be completely autonomous: no external toolchain install, no
     `runme64.bat`, no user terminal. This script silently downloads and
     extracts the headless build bundle (~120-150 MB) containing:
 

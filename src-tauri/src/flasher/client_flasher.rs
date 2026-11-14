@@ -115,7 +115,7 @@ pub async fn flash_with_proxmark3(
 }
 
 /// Fallback flasher: `pm3-flash-all <port> <bootrom.elf> <fullimage.elf>`.
-/// Built from ProxSpace `tools/pm3-flash-all.c`.
+/// Built from upstream pm3-flash-all.c.
 pub async fn flash_with_pm3_flash_all(
     port: &str,
     bootrom_path: &Path,

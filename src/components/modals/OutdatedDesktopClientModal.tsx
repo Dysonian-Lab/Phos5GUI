@@ -96,7 +96,7 @@ export function OutdatedDesktopClientModal({
         </div>
         <div style={actionsStyle}>
           <button type="button" style={primaryBtn} onClick={onUseLocalClient}>
-            Use Local ProxSpace Client
+            Use Local Client
           </button>
           <button type="button" style={secondaryBtn} onClick={onRebuildClient}>
             Rebuild Matching Client

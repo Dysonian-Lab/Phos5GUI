@@ -7,7 +7,7 @@
 //! the runtime locations, and finally runs the existing 4-stage PM5 flasher.
 //!
 //! Design constraints (Section 14.6):
-//! - All build work runs inside `.build-env` only; no host ProxSpace tree is read,
+//! - All build work runs inside `.build-env` only; no host toolchain tree is read,
 //!   written or locked.
 //! - The seeded toolchain at `.build-env/toolchain` is required. If it is missing
 //!   the bootstrap script is invoked to seed it.
