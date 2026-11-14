@@ -12,7 +12,7 @@
 //! The old implementation had three defects that made bug reports unusable:
 //!
 //! 1. **It wrote to a hardcoded developer path**
-//!    (`D:\kilocode\Phosphor-debug\Phosphor2.2GUI\logs`). On any other machine
+//!    (e.g. a developer-local directory). On any other machine
 //!    `create_dir_all` failed and the function returned silently, so the tester
 //!    got NO log at all -- and nothing anywhere said so. This is the single
 //!    worst failure mode: it looks identical to "nothing went wrong".

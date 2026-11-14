@@ -13,6 +13,6 @@ PM3_SRC="$PROJECT_ROOT/.build-env/pm3-src"
 
 cd "$PM3_SRC"
 
-# Client build (standard PM5)
+# Client build (standard PM5) - Windows MinGW target, avoid POSIX-only APIs
 make clean PLATFORM=PM5
-make -j4 PLATFORM=PM5
+make -j4 client PLATFORM=PM5

@@ -83,7 +83,7 @@ pub fn run() {
             // Open the session diagnostic log and write the environment header.
             //
             // This replaces a startup marker that wrote to a HARDCODED developer
-            // path (`D:\kilocode\...\logs`). On any other machine that path was
+            // path (e.g. a developer-local directory). On any other machine that path was
             // not creatable, so the marker was skipped silently and testers
             // produced NO log at all -- the worst possible failure, since it is
             // indistinguishable from "nothing went wrong". See `logging`.

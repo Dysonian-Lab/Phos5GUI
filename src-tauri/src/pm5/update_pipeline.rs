@@ -489,9 +489,16 @@ async fn run_make(
         Some(e) => format!("PLATFORM=PM5 PLATFORM_EXTRAS={e}"),
         None => "PLATFORM=PM5".to_string(),
     };
+    // Client builds run on Windows MinGW: avoid POSIX-only wait APIs by targeting
+    // the client explicitly with PLATFORM=PM5 in the seeded mingw64 environment.
+    let make_cmd = if extras.is_none() {
+        format!("make -j4 client {target}")
+    } else {
+        format!("make -j4 {target}")
+    };
     let script = format!(
         "export PATH=\"/usr/bin:/mingw64/bin:/opt/arm-none-eabi/bin:$PATH\"; \
-         cd \"{msys}\" || exit 1; make -j4 {target}"
+         cd \"{msys}\" || exit 1; {make_cmd}"
     );
 
     emit_status(
@@ -847,13 +854,18 @@ mod tests {
 
     #[test]
     fn to_msys_path_converts_windows_drive() {
+        // Arbitrary drive letters must convert dynamically (e.g. D:\, C:\, E:\).
         assert_eq!(
-            to_msys_path(Path::new(r"D:\kilocode\phos5gui\.build-env\pm3-src")),
-            "/d/kilocode/phos5gui/.build-env/pm3-src"
+            to_msys_path(Path::new(r"D:\workspace\project\.build-env\pm3-src")),
+            "/d/workspace/project/.build-env/pm3-src"
         );
         assert_eq!(
             to_msys_path(Path::new(r"C:\Users\Owner\AppData\Local\Temp")),
             "/c/Users/Owner/AppData/Local/Temp"
+        );
+        assert_eq!(
+            to_msys_path(Path::new(r"E:\build\sandbox")),
+            "/e/build/sandbox"
         );
         // Non-drive paths are returned unchanged (already POSIX).
         assert_eq!(to_msys_path(Path::new("/d/already/posix")), "/d/already/posix");

@@ -36,5 +36,5 @@ $envPath = "PATH=/usr/bin:/mingw64/bin:/opt/arm-none-eabi/bin:`$PATH"
 # Firmware (BWM variant)
 & $localBash -c "$envPath && cd '$pm3SrcMsys' && make -j4 PLATFORM=PM5 PLATFORM_EXTRAS=BWM"
 
-# Client (standard)
-& $localBash -c "$envPath && cd '$pm3SrcMsys' && make -j4 PLATFORM=PM5"
+# Client (standard) - Windows MinGW target, avoid POSIX-only APIs (sys/wait.h)
+& $localBash -c "$envPath && cd '$pm3SrcMsys' && make -j4 client PLATFORM=PM5"
