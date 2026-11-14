@@ -33,15 +33,13 @@
     "externalBin": [
       "binaries/proxmark3"
     ],
-    "resources": {
-      "binaries/proxmark3/*.dll": "./binaries/proxmark3/",
-      "firmware/pm5/standard/bootrom.elf": "./firmware/pm5/standard/",
-      "firmware/pm5/standard/fullimage.elf": "./firmware/pm5/standard/",
-      "firmware/pm5/bwm/bootrom.elf": "./firmware/pm5/bwm/",
-      "firmware/pm5/bwm/fullimage.elf": "./firmware/pm5/bwm/",
-      "firmware/pm5/fpga_bitstream.bin": "./firmware/pm5/",
-      "capabilities/pm5.json": "./capabilities/pm5.json"
-    },
+    "resources": [
+      "binaries/proxmark3/*.dll",
+      "firmware/pm5/standard/*",
+      "firmware/pm5/bwm/*",
+      "firmware/pm5/fpga_bitstream.bin",
+      "capabilities/pm5.json"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
