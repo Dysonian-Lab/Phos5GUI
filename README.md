@@ -1,10 +1,10 @@
-# Phosphor 2.2 GUI
+﻿# Phosphor 2.2 GUI
 
 Desktop GUI for Proxmark3. Scan, clone and manage RFID/NFC cards without touching the command line.
 
 ![Windows](https://img.shields.io/badge/Windows-10%2B-blue) ![License](https://img.shields.io/badge/license-GPL--3.0-green) ![Version](https://img.shields.io/badge/version-2.2.1-brightgreen)
 
-> ### ⚠️ Requirements — read before using this build
+> ### âš ï¸ Requirements â€” read before using this build
 >
 > **v2.2.1 only works with one of these two device firmwares:**
 >
@@ -15,7 +15,7 @@ Desktop GUI for Proxmark3. Scan, clone and manage RFID/NFC cards without touchin
 >
 > Client and firmware must be flashed as a **matched pair**. A stock Proxmark
 > firmware, a partially flashed device, or an iCopy-X still on its factory
-> Proxmark build will misbehave — most visibly as blank/failed detection that
+> Proxmark build will misbehave â€” most visibly as blank/failed detection that
 > is not a real detection fault.
 >
 > Verify with `hw version`: you must see `v4.23346` and
@@ -32,23 +32,23 @@ Phosphor wraps the Proxmark3 client into a visual wizard. You plug in your Proxm
 
 ## What's new in 2.2.1
 
-- **Retry a failed write in place** — RETRY now returns to the blank step and keeps your source card and device connection. It used to drop you back at Scan and discard the source card, so a failed write could never be retried without walking the whole wizard again.
-- **Failed verification is retryable** — previously a failed verify only offered RESET (discard everything) or DISCONNECT (unplug).
-- **New BACK button after a successful clone** — returns to the blank step while staying connected and keeping the source card loaded.
-- **Fixed: T5577 blank detection missed `T55x7`** — Iceman prints the chip with a lowercase `x`, which the detector never matched, so it fell back to matching surrounding label text. Any firmware formatting that label differently reported a blank as absent ("Place the correct blank" on a PM3 Easy).
+- **Retry a failed write in place** â€” RETRY now returns to the blank step and keeps your source card and device connection. It used to drop you back at Scan and discard the source card, so a failed write could never be retried without walking the whole wizard again.
+- **Failed verification is retryable** â€” previously a failed verify only offered RESET (discard everything) or DISCONNECT (unplug).
+- **New BACK button after a successful clone** â€” returns to the blank step while staying connected and keeping the source card loaded.
+- **Fixed: T5577 blank detection missed `T55x7`** â€” Iceman prints the chip with a lowercase `x`, which the detector never matched, so it fell back to matching surrounding label text. Any firmware formatting that label differently reported a blank as absent ("Place the correct blank" on a PM3 Easy).
 - **The version shown in the app is now read from `package.json`**, so the splash screen and top bar can no longer drift from the real build version.
 
 ### What's new in 2.2.0
 
-- **Iceman fork v4.23346** — upgraded PM3 firmware base to the latest upstream
-- **CAPABILITIES_VERSION 11** — client and firmware must be flashed as a matched pair
-- **21 Advanced tab panels** — up from 14. New tabs: DESFire, MF View (RKF/VIGIK/HID PACS), eMRTD (PACE-CAM passport), Smart Card (ISO 7816-3 PPS), Antifuzz, T55xx, Trace
-- **Full DESFire support** — a dedicated panel exposing all 57 `hf mfdes` subcommands: card info, application/file/key management, `read`/`write`/`value`, `dump`, `detect`, key `chk`, `bruteaid`, the self-contained EV1 emulator (`eload`/`esave`/`eview`/`view`/`sim`/`etest`), card configuration, and DUOX (`verifycert`, `intauth`, `vdesign`)
+- **Iceman fork v4.23346** â€” upgraded PM3 firmware base to the latest upstream
+- **CAPABILITIES_VERSION 11** â€” client and firmware must be flashed as a matched pair
+- **21 Advanced tab panels** â€” up from 14. New tabs: DESFire, MF View (RKF/VIGIK/HID PACS), eMRTD (PACE-CAM passport), Smart Card (ISO 7816-3 PPS), Antifuzz, T55xx, Trace
+- **Full DESFire support** â€” a dedicated panel exposing all 57 `hf mfdes` subcommands: card info, application/file/key management, `read`/`write`/`value`, `dump`, `detect`, key `chk`, `bruteaid`, the self-contained EV1 emulator (`eload`/`esave`/`eview`/`view`/`sim`/`etest`), card configuration, and DUOX (`verifycert`, `intauth`, `vdesign`)
 - **New commands**: `hf mf view`, `hf 14b view -f` (MyKey/COGES), `smart pps`, `hf emrtd info/dump/list/test`, `trace clear`, `hf 14a antifuzz --coll`, `lf t55xx set config/chk pwds/dangerraw/wakeup`, `hf thinfilm sim`, `mad read/write/verify/decode/encode`, `nfc encode`, `hf mfu ndefwrite/ndefformat/chk`, `hf iclass legbrute`, `hf 14b rdbl/ctrdbl/view --selftest`, `hf calypso info/dump/list`, `hf felica sim`, `lf trovan`
-- **Command alignment** — `hf mf cchk` + `hf mf aeschk` merged into `hf mf chk`; `hf 14b valid` removed
-- **19 unreleased master features evaluated** — 13 fully covered, 2 partial, 4 N/A (BWM BLE/WiFi/power, hw powersave, Flipper Zero link, ePassport)
-- **Fixed: T55xx dictionary checks no longer time out** — `lf t55xx chk` took 26.8s against a 30s cap; on a slower run the Proxmark3 process was killed mid-attack while holding the serial port, breaking the *next* command. Brute-force commands now get a 15-minute budget
-- **Readable PM3 errors** — documented exit codes are translated into plain language instead of raw integers like `Exit code -20`
+- **Command alignment** â€” `hf mf cchk` + `hf mf aeschk` merged into `hf mf chk`; `hf 14b valid` removed
+- **19 unreleased master features evaluated** â€” 13 fully covered, 2 partial, 4 N/A (BWM BLE/WiFi/power, hw powersave, Flipper Zero link, ePassport)
+- **Fixed: T55xx dictionary checks no longer time out** â€” `lf t55xx chk` took 26.8s against a 30s cap; on a slower run the Proxmark3 process was killed mid-attack while holding the serial port, breaking the *next* command. Brute-force commands now get a 15-minute budget
+- **Readable PM3 errors** â€” documented exit codes are translated into plain language instead of raw integers like `Exit code -20`
 
 ## Supported cards
 
@@ -60,9 +60,9 @@ HID ProxII, EM4100, AWID, IOProx, Indala, FDX-B, HID Corporate 1000, Paradox, Ke
 
 MIFARE Classic 1K/4K (with autopwn key recovery), MIFARE Ultralight, NTAG, iCLASS/PicoPass, DESFire, DESFire Light (DUOX)
 
-DESFire cards are detected and can be fully managed from the **Advanced → DESFire**
+DESFire cards are detected and can be fully managed from the **Advanced â†’ DESFire**
 panel (dump, read/write, key recovery, emulator). They are not "cloned" onto a
-magic card the way MIFARE Classic is — DESFire has no universal magic card.
+magic card the way MIFARE Classic is â€” DESFire has no universal magic card.
 
 ### Supported magic blanks
 
@@ -87,10 +87,10 @@ That variant ships the Proxmark module as **Iceman v4.23346**
 is verified against. Client and firmware feature versions must match or the
 Proxmark refuses to talk.
 
-> ⚠️ **Phosphor does not update or flash an iCopy-X.**
+> âš ï¸ **Phosphor does not update or flash an iCopy-X.**
 >
 > Updating an iCopy-X is an **IPK update performed on the device**, not a
-> Proxmark firmware flash from the desktop. This is a manual, optional step —
+> Proxmark firmware flash from the desktop. This is a manual, optional step â€”
 > if your device already reports Iceman v4.23346, you do not need to do
 > anything.
 >
@@ -101,7 +101,7 @@ Proxmark refuses to talk.
 > |---|---|
 > | `1.0.90` | The device's own base/bootloader firmware. A **precondition**, not an upgrade target. |
 > | `v1.1.5` / `v1.1.6` | The **IPK package** (device shell + menus). |
-> | `v4.23346` | The **Iceman Proxmark client/firmware bundled inside** that IPK — what Phosphor talks to. |
+> | `v4.23346` | The **Iceman Proxmark client/firmware bundled inside** that IPK â€” what Phosphor talks to. |
 >
 > v1.1.5 and v1.1.6 both ship Iceman v4.23346, so flashing v1.1.6 over
 > v1.1.5 does not change the Proxmark client Phosphor depends on. Per
@@ -111,9 +111,9 @@ Proxmark refuses to talk.
 > 2. Put the iCopy-X into **PC-Mode**
 > 3. Delete **all other** IPK files from the device
 > 4. Transfer the IPK, then close PC-Mode
-> 5. On the device: **About → Update**, press OK
+> 5. On the device: **About â†’ Update**, press OK
 > 6. Using the `flash` variant, the device offers to flash the Proxmark
->    firmware — accept it
+>    firmware â€” accept it
 >
 > Use **`icopy-x-flash.ipk`** (Iceman v4.23346, matching Phosphor), not
 > `icopy-x-noflash.ipk` (which leaves the factory Proxmark in place and will not
@@ -130,7 +130,7 @@ Proxmark refuses to talk.
 ### Driver notes
 
 - RDV4 / Easy / iCopy-X: use the Proxmark3 USB CDC driver from the PM3 installer or Zadig if Windows does not auto-enumerate the COM port.
-- If the port does not appear, check Device Manager → Ports (COM & LPT).
+- If the port does not appear, check Device Manager â†’ Ports (COM & LPT).
 
 ### WebView2 runtime
 
@@ -140,16 +140,16 @@ Phosphor uses Tauri with the OS WebView. Windows 10 May 2020 Update (1903+) ship
 
 ```
 Phosphor_2.2_GUI_v2.2.1_Windows_Portable/
-├── phosphor.exe
-├── proxmark3.exe
-├── *.dll
-├── resources/
-├── firmware/
-│   ├── rdv4/
-│   ├── rdv4-bt/
-│   └── generic/
-├── pm3-libs/
-└── platforms/
+â”œâ”€â”€ phosphor.exe
+â”œâ”€â”€ proxmark3.exe
+â”œâ”€â”€ *.dll
+â”œâ”€â”€ resources/
+â”œâ”€â”€ firmware/
+â”‚   â”œâ”€â”€ rdv4/
+â”‚   â”œâ”€â”€ rdv4-bt/
+â”‚   â””â”€â”€ generic/
+â”œâ”€â”€ pm3-libs/
+â””â”€â”€ platforms/
 ```
 
 ## Installation (setup-based)
@@ -166,9 +166,9 @@ Phosphor_2.2_GUI_v2.2.1_Windows_Portable/
 - **MIFARE Classic autopwn** with live progress (dictionary, nested, darkside, hardnested attacks)
 - **Magic card detection** identifies Gen1a through Gen4 GDM
 - **Blank card data check** warns if the blank already has data written to it
-- **Firmware flash** with variant picker (RDV4, RDV4+BT, Generic) — **not for iCopy-X**, see the warning above
+- **Firmware flash** with variant picker (RDV4, RDV4+BT, Generic) â€” **not for iCopy-X**, see the warning above
 - **T5577 chip detection** and password-protected chip handling
-- **Advanced Tools tab** — 21 panels covering ISO 14443-B/15693, Felica, iCLASS, LEGIC, **DESFire**, MIFARE View, Calypso, ThinFilm, MAD, NFC, Ultralight, eMRTD, Smart Card, Antifuzz, T55xx, Trace, Lua scripting, firmware flashing, tuning and antenna tests
+- **Advanced Tools tab** â€” 21 panels covering ISO 14443-B/15693, Felica, iCLASS, LEGIC, **DESFire**, MIFARE View, Calypso, ThinFilm, MAD, NFC, Ultralight, eMRTD, Smart Card, Antifuzz, T55xx, Trace, Lua scripting, firmware flashing, tuning and antenna tests
 - **Sound effects** and terminal-style UI
 
 ## Troubleshooting
@@ -204,4 +204,9 @@ Created by **Dysonian Lab** (fork of [nik shuv/phosphor](https://github.com/niki
 
 ## License
 
-[GPL-3.0](LICENSE) — Copyright 2025-2026 Dysonian Lab
+[GPL-3.0](LICENSE) â€” Copyright 2025-2026 Dysonian Lab
+
+
+## Packaging notes (Windows / Tauri v2)
+
+> **Warning:** Do not revert undle.resources in src-tauri/tauri.conf.json to object/map syntax. Use array/list syntax only (e.g. ["binaries/proxmark3/*.dll", "firmware/pm5/**", "capabilities/pm5.json"]). Map syntax can trigger Windows 	auri-build failures (os error 183 / os error 5). See [docs/PACKAGING_NOTES.md](docs/PACKAGING_NOTES.md) for rules and rationale.
