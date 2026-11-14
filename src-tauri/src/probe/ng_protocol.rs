@@ -261,24 +261,24 @@ pub async fn probe_device_capabilities(port: &str, baudrate: u32) -> Result<Prob
     let _guard = lock.lock().await;
 
     // Own the port string so the `'static` `spawn_blocking` closure can move it in.
-    let port = port.to_string();
+    let port_owned = port.to_string();
     let result = tokio::task::spawn_blocking(move || -> Result<ProbeResult, AppError> {
         // 1. Open the serial port directly.
-        let mut sp = serialport::new(&port, baudrate)
+        let mut port = serialport::new(port_owned.as_str(), baudrate)
             .timeout(Duration::from_millis(2000))
             .open()
             .map_err(|e| {
-                AppError::CommandFailed(format!("Failed to open serial port {port}: {e}"))
+                AppError::CommandFailed(format!("Failed to open serial port {port_owned}: {e}"))
             })?;
 
         // 2. Send CMD_PING (NG frame) with an incrementing 32-byte pattern.
         let ping_payload: Vec<u8> = (0..PING_PAYLOAD_LEN as u8).collect();
         let ping_frame = build_ng_frame(CMD_PING, &ping_payload);
-        sp.write_all(&ping_frame)
+        port.write_all(&ping_frame)
             .map_err(|e| AppError::CommandFailed(format!("Failed to write CMD_PING: {e}")))?;
 
         // 3. Read the PING response and verify the echo.
-        let ping_resp = read_ng_response(&mut *sp)?;
+        let ping_resp = read_ng_response(&mut *port)?;
         if ping_resp.status != 0 {
             return Err(AppError::CommandFailed(format!(
                 "CMD_PING rejected with status {} reason {}",
@@ -291,11 +291,11 @@ pub async fn probe_device_capabilities(port: &str, baudrate: u32) -> Result<Prob
 
         // 4. Send CMD_CAPABILITIES (no payload).
         let caps_frame = build_ng_frame(CMD_CAPABILITIES, &[]);
-        sp.write_all(&caps_frame)
+        port.write_all(&caps_frame)
             .map_err(|e| AppError::CommandFailed(format!("Failed to write CMD_CAPABILITIES: {e}")))?;
 
         // 5. Read the capabilities response.
-        let caps_resp = read_ng_response(&mut *sp)?;
+        let caps_resp = read_ng_response(&mut *port)?;
         if caps_resp.status != 0 {
             return Err(AppError::CommandFailed(format!(
                 "CMD_CAPABILITIES rejected with status {} reason {}",
@@ -309,7 +309,7 @@ pub async fn probe_device_capabilities(port: &str, baudrate: u32) -> Result<Prob
 
         // 7. CRITICAL: explicitly drop the port handle before returning so the
         //    Windows COM port lock is released.
-        drop(sp);
+        drop(port);
 
         Ok(ProbeResult {
             capabilities_version: version,

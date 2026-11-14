@@ -1,9 +1,11 @@
 ﻿pub mod bwm;
 pub mod capabilities;
 pub mod cep;
+pub mod commands;
+pub mod device;
+pub mod firmware;
 pub mod fpga;
-pub mod rgb_power;
 pub mod hardware;
+pub mod rgb_power;
 pub mod update_pipeline;
-
-
+pub mod version;

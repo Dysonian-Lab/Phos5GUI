@@ -20,7 +20,7 @@ Phos5GUI is a **fork** of Phosphor-2.0-GUI refocused on Proxmark5. We **do not r
 **Solution Architecture:**
 1. **Direct Rust Serial Probe** — Tauri opens COM port directly via `serialport-rs`, sends raw `CMD_PING` + `CMD_CAPABILITIES` (NG frames) **before** launching `proxmark3.exe`
 2. **Error Message Scraping** — Fallback: parse stderr from failed `proxmark3.exe` connection attempt
-3. **Patched Client Binary** — Build custom `proxmark3.exe` with the version check relaxed to WARNING (not fatal)
+3. **Strict Version Matching (NO relaxed patch)** — Firmware MUST strictly match the client. `CAPABILITIES_VERSION` mismatch remains a **fatal safety exit**. The GUI enforces flashing bundled matching firmware on mismatch. **No `comms_relaxed_version.patch` is applied.** `comms.c` is **not** patched to relax the version check.
 4. **Bootloader-Aware Flashing** — Separate flash flow using `pm3-flash-all` / bootloader mode
 
 ---
@@ -315,29 +315,21 @@ static CAPABILITIES_MISMATCH_RE: LazyLock<Regex> = LazyLock::new(|| {
 // Group 1 = device version, Group 2 = client version
 ```
 
-#### Layer 3: Patched Client Binary (For Actual Operations)
-**File:** `src-tauri/src/client_patch/comms_patch.c`
+#### Layer 3: Strict Version Matching (No Patched Client)
+**Status: DISABLED — Relaxed comms.c patching is NOT used.**
 
-Build a custom `proxmark3.exe` where the fatal check becomes a **warning**:
+Relaxed capabilities patching (`comms_relaxed_version.patch`) is **disabled** for hardware safety. Firmware MUST strictly match the client. `CAPABILITIES_VERSION` mismatch remains a **fatal safety exit** in `client/src/comms.c`. The GUI does **not** apply any relaxed patch to `comms.c`.
 
-```c
-// In client/src/comms.c - PATCHED VERSION
+**Mismatch handling:** When `device_ver != client_ver`, the connection state machine transitions to `version_mismatch_prompt`. The user must flash the bundled matching firmware (standard or BWM variant) before the device can be used. There is no "continue in compatibility mode" bypass.
+
+```rust
+// client/src/comms.c — UNPATCHED, fatal check remains
 if ((resp.length != sizeof(g_pm3_capabilities)) ||
     (resp.data.asBytes[0] != CAPABILITIES_VERSION)) {
-    PrintAndLogEx(WARNING, _YELLOW_("Capabilities version mismatch: device v%u, client v%u. Continuing anyway..."), 
-                  resp.data.asBytes[0], CAPABILITIES_VERSION);
-    // DO NOT RETURN PM3_EDEVNOTSUPP
-    // Instead: copy what we can, continue
-    size_t copy_len = MIN(resp.length, sizeof(g_pm3_capabilities));
-    memcpy(&g_pm3_capabilities, resp.data.asBytes, copy_len);
-    // Zero out unknown fields
-    if (copy_len < sizeof(g_pm3_capabilities)) {
-        memset(((uint8_t*)&g_pm3_capabilities) + copy_len, 0, sizeof(g_pm3_capabilities) - copy_len);
-    }
+    PrintAndLogEx(ERR, "Capabilities structure version sent by Proxmark3 is not the one expected by this client! (v%u != v%u)");
+    return PM3_EDEVNOTSUPP;  // <-- Client exits, no capabilities returned
 }
 ```
-
-**Build Process:** `scripts/build-patched-client.sh` applies this patch during ProxSpace build.
 
 ### 4.3 Revised Mediation Strategy — "Stale Hardware" Decision Engine
 
@@ -866,10 +858,10 @@ An automated background state machine tracks rapid upstream PM5 changes (multipl
              * Button: [ 1-Click Update & Flash ]
                          │
                          ▼
-             [Automated Background Pipeline]
-             1. Git fast-forward merge into .build-env/pm3-src
-             2. Apply comms_relaxed_version.patch
-             3. Silent headless compile via seeded micro-toolchain:
+[Automated Background Pipeline]
+              1. Git fast-forward merge into .build-env/pm3-src
+              2. **Strict version match enforced — no comms_relaxed_version.patch applied.** `comms.c` is NOT patched.
+              3. Silent headless compile via seeded micro-toolchain:
                 - make -j4 PLATFORM=PM5 PLATFORM_EXTRAS=BWM   (firmware)
                 - make -j4 PLATFORM=PM5                        (client)
              4. Hot-swap active Tauri client sidecar

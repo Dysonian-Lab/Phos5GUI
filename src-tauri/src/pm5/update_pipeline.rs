@@ -92,6 +92,21 @@ fn is_project_root(dir: &Path) -> bool {
     dir.join("src-tauri").is_dir() && dir.join("package.json").is_file()
 }
 
+fn is_runtime_root(dir: &Path) -> bool {
+    dir.join(".build-env").is_dir() || dir.join("_up_").join(".build-env").is_dir()
+}
+
+fn normalize_runtime_root(dir: &Path) -> PathBuf {
+    if dir.join(".build-env").is_dir() {
+        return dir.to_path_buf();
+    }
+    let up = dir.join("_up_");
+    if up.join(".build-env").is_dir() {
+        return up;
+    }
+    dir.to_path_buf()
+}
+
 fn find_project_root_from(start: &Path) -> Option<PathBuf> {
     let mut cur = start.to_path_buf();
     loop {
@@ -104,33 +119,47 @@ fn find_project_root_from(start: &Path) -> Option<PathBuf> {
     }
 }
 
-/// Resolve the project root by walking up from the executable, the current
-/// working directory, and the compile-time manifest directory. This makes the
-/// pipeline independent of the directory the app was launched from.
+fn find_runtime_root_from(start: &Path) -> Option<PathBuf> {
+    let mut cur = start.to_path_buf();
+    loop {
+        if is_runtime_root(&cur) {
+            return Some(normalize_runtime_root(&cur));
+        }
+        if !cur.pop() {
+            return None;
+        }
+    }
+}
+
+/// Resolve runtime root containing `.build-env/`.
+/// Works for portable/USB-stick installs (exe dir arbitrary) and dev layouts; no hardcoded dev paths.
 fn resolve_project_root() -> Result<PathBuf, AppError> {
-    let mut anchors: Vec<PathBuf> = Vec::new();
     if let Ok(exe) = std::env::current_exe() {
         if let Some(parent) = exe.parent() {
-            anchors.push(parent.to_path_buf());
+            if let Some(root) = find_runtime_root_from(parent) {
+                return Ok(root);
+            }
+            if let Some(root) = find_project_root_from(parent) {
+                return Ok(root);
+            }
         }
     }
     if let Ok(cwd) = std::env::current_dir() {
-        anchors.push(cwd);
+        if let Some(root) = find_runtime_root_from(&cwd) {
+            return Ok(root);
+        }
+        if let Some(root) = find_project_root_from(&cwd) {
+            return Ok(root);
+        }
     }
-    anchors.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")));
-
-    anchors
-        .into_iter()
-        .find_map(|anchor| find_project_root_from(&anchor))
-        .ok_or_else(|| {
-            AppError::CommandFailed(
-                "Could not locate the project root (looked for a directory \
-                 containing both src-tauri/ and package.json)."
-                    .to_string(),
-            )
-        })
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    if let Some(root) = find_project_root_from(&manifest).or_else(|| find_runtime_root_from(&manifest)) {
+        return Ok(root);
+    }
+    Err(AppError::CommandFailed(
+        "Could not locate runtime root containing .build-env (checked executable directory, current directory, and compile-time paths).".to_string(),
+    ))
 }
-
 fn sandbox_root(root: &Path) -> PathBuf {
     root.join(".build-env")
 }
@@ -144,6 +173,10 @@ fn toolchain_dir(root: &Path) -> PathBuf {
 }
 
 fn patch_file(root: &Path) -> PathBuf {
+    let sandbox = sandbox_root(root).join("patches").join("comms_relaxed_version.patch");
+    if sandbox.is_file() {
+        return sandbox;
+    }
     root.join("src-tauri")
         .join("src")
         .join("client_patch")
@@ -487,7 +520,7 @@ async fn run_make(
     let msys = to_msys_path(&src);
     let target = match extras {
         Some(e) => format!("PLATFORM=PM5 PLATFORM_EXTRAS={e}"),
-        None => "PLATFORM=PM5".to_string(),
+        None => "PLATFORM=PM5 SKIPQT=1 IS_MINGW=1 LUAPLATFORM=mingw SKIPPYTHON=1".to_string(),
     };
     // Client builds run on Windows MinGW: avoid POSIX-only wait APIs by targeting
     // the client explicitly with PLATFORM=PM5 in the seeded mingw64 environment.
@@ -751,14 +784,16 @@ pub async fn execute_update_pipeline(app: AppHandle, port: String) -> Result<Str
     );
     git_output(&root, &src, &["merge", "--ff-only", "origin/master"]).await?;
 
-    // Step 3: apply the relaxed capabilities patch (idempotent).
+    // Step 3: relaxed capabilities patch is DISABLED (strict version match policy).
+    // Firmware MUST strictly match the client. CAPABILITIES_VERSION mismatch is a
+    // fatal safety exit — mismatches require flashing bundled matching firmware.
     emit_status(
         &app,
         PipelineStatus::Patching,
         20,
-        "Applying relaxed capabilities patch ...",
+        "Strict version match enforced — no relaxed comms.c patch applied.",
     );
-    apply_patch(&root).await?;
+    // Patch application intentionally skipped: do not relax version checks.
 
     // Step 4: compile firmware (BWM). Safety gate: abort before hot-swap on error.
     if let Err(e) = run_make(
