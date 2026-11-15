@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { TopBar } from './TopBar';
 import { Sidebar, type TabId } from './Sidebar';
 import { StatusBar, type SystemStatus } from './StatusBar';
@@ -44,6 +44,19 @@ export function MainLayoutShell() {
 
   // B1: Derive PM3 connection status from wizard step
   const connected = wizard.currentStep !== 'Idle' && wizard.currentStep !== 'DetectingDevice';
+
+  // Auto-connect on startup: probe for a PM3 device once when the shell mounts.
+  // Reuses the existing `detect_device` Tauri command and wizard `DETECT` transition
+  // (same path as the manual CONNECT button in ConnectStep). No reinvention.
+  const hasAttemptedAutoDetect = useRef(false);
+  useEffect(() => {
+    if (hasAttemptedAutoDetect.current) return;
+    if (wizard.isLoading) return;
+    if (wizard.context.port !== null) return;
+    if (wizard.context.errorMessage) return;
+    hasAttemptedAutoDetect.current = true;
+    wizard.detect();
+  }, [wizard.detect, wizard.isLoading, wizard.context.port, wizard.context.errorMessage]);
 
   // Determine whether the connected device is a PM5.
   const isPm5 = wizard.context.model ? String(wizard.context.model).toUpperCase().includes('PM5') : false;
@@ -178,50 +191,59 @@ export function MainLayoutShell() {
     <div
       style={{
         display: 'grid',
-        gridTemplateRows: '32px 1fr auto 24px',
+        gridTemplateRows: '32px 1fr auto auto 24px',
         gridTemplateColumns: '180px 1fr',
         width: '100%',
         height: '100%',
         position: 'relative',
-        zIndex: 1,
+        zIndex: 10,
+        background: 'var(--bg-void)',
       }}
     >
       {/* TopBar spans full width */}
-      <div style={{ gridColumn: '1 / -1' }}>
+      <div style={{ gridColumn: '1 / -1', gridRow: '1' }}>
         <TopBar connected={connected} onDisconnect={wizard.disconnect} />
       </div>
 
       {/* Sidebar */}
-      <Sidebar
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        deviceName={wizard.context.model || '---'}
-        devicePort={wizard.context.port || '---'}
-        firmware={wizard.context.firmware || '---'}
-        isPm5={isPm5}
-        featureSet={featureSet}
-      />
+      <div style={{ gridRow: '2', gridColumn: '1' }}>
+        <Sidebar
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          deviceName={wizard.context.model || '---'}
+          devicePort={wizard.context.port || '---'}
+          firmware={wizard.context.firmware || '---'}
+          isPm5={isPm5}
+          featureSet={featureSet}
+        />
+      </div>
 
       {/* Degraded-mode banner (content width) */}
-      <div style={{ gridColumn: '1 / -1' }}>{degradedBanner}</div>
+      <div style={{ gridColumn: '1 / -1', gridRow: '3' }}>{degradedBanner}</div>
 
       {/* Main content area */}
       <div
         style={{
+          gridRow: '2',
+          gridColumn: '2',
           overflow: 'auto',
           position: 'relative',
+          zIndex: 10,
+          background: 'var(--bg-void)',
+          width: '100%',
+          height: '100%',
         }}
       >
         {renderContent()}
       </div>
 
       {/* LiveTerminal spans full width */}
-      <div style={{ gridColumn: '1 / -1' }}>
+      <div style={{ gridColumn: '1 / -1', gridRow: '4' }}>
         <LiveTerminal />
       </div>
 
       {/* StatusBar spans full width */}
-      <div style={{ gridColumn: '1 / -1' }}>
+      <div style={{ gridColumn: '1 / -1', gridRow: '5' }}>
         <StatusBar status={status} message={statusMessage} musicEnabled={musicEnabled} onMusicToggle={toggleMusic} />
       </div>
 

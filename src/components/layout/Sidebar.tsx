@@ -114,7 +114,7 @@ export function Sidebar({
           return (
             <div
               key={tab.id}
-              onClick={() => { sfx.click(); onTabChange(tab.id); }}
+              onClick={() => { onTabChange(tab.id); }}
               onMouseEnter={() => { sfx.hover(); setHoveredTab(tab.id); }}
               onMouseLeave={() => setHoveredTab(null)}
               style={{

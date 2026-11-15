@@ -83,6 +83,36 @@ pub async fn evaluate_version_match(
         .await
         .map_err(|e| e.to_string())?;
 
+    // When Layer 2 `hw version` succeeded (exit code 0) but capabilities_version
+    // couldn't be extracted from stdout (direct serial probe timed out), we must
+    // still check for commit mismatch by parsing the hw version output directly.
+    // Returning `Matched` here would suppress the DeviceOutdated modal and the
+    // firmware update flow even when the device firmware is outdated.
+    if probe_result.capabilities_version == 0
+        && probe_result.method == ProbeMethod::StderrScraping
+    {
+        let hw_output = match connection::run_command(&app, &port, "hw version").await {
+            Ok(output) => output,
+            Err(e) => {
+                return Ok(VersionMatchStatus::ProbeFailed {
+                    reason: format!("hw version check failed: {}", e),
+                });
+            }
+        };
+
+        // Parse using the PM3 hw version parser to compare client vs device commits.
+        let hw_info = crate::pm3::version::parse_detailed_hw_version(&hw_output);
+        if hw_info.versions_match {
+            return Ok(VersionMatchStatus::Matched);
+        }
+
+        // Commits mismatch — device is outdated (State A per Plan Section 4.3).
+        return Ok(VersionMatchStatus::DeviceOutdated {
+            device_ver: probe_result.capabilities_version,
+            client_ver: CLIENT_CAPABILITIES_VERSION,
+        });
+    }
+
     Ok(evaluate_capabilities(
         probe_result.capabilities_version,
         CLIENT_CAPABILITIES_VERSION,

@@ -136,7 +136,7 @@ pub struct ProbeResult {
 }
 
 /// How the capabilities were obtained.
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, PartialEq)]
 pub enum ProbeMethod {
     DirectSerial,
     StderrScraping,
