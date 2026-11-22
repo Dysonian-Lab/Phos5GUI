@@ -16,7 +16,8 @@ export type TabId =
   | 'rgb'
   | 'power'
   | 'factory'
-  | 'antenna';
+  | 'antenna'
+  | 'ics';
 
 interface SidebarProps {
   activeTab: TabId;
@@ -38,6 +39,7 @@ const PM5_TABS: { id: TabId; label: string; requiredFlag?: keyof UiFeatureSet }[
   { id: 'power', label: 'POWER', requiredFlag: 'canAccessFpga' },
   { id: 'factory', label: 'FACTORY', requiredFlag: 'canAccessFpga' },
   { id: 'antenna', label: 'ANTENNA', requiredFlag: 'canAccessFpga' },
+  { id: 'ics', label: 'ICS DECODER', requiredFlag: 'canAccessFpga' },
 ];
 
 const CORE_TABS: { id: TabId; label: string }[] = [

@@ -81,7 +81,7 @@ export interface UseWizardReturn {
   /** Cancel in-progress firmware flash */
   cancelFirmware: () => void;
   /** Select hardware variant (used when capabilities mismatch prevents auto-detection) */
-  selectVariant: (variant: 'rdv4' | 'rdv4-bt' | 'generic') => void;
+  selectVariant: (variant: 'rdv4' | 'rdv4-bt' | 'generic' | 'pm5-standard' | 'pm5-bwm') => void;
   /** Go back to device-connected state, clearing card data but keeping device */
   backToScan: () => Promise<void>;
   /** Soft reset: return to device-connected from complete/error, keeping device */
@@ -298,7 +298,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     send({ type: 'CANCEL_FIRMWARE' });
   }, [send]);
 
-  const selectVariant = useCallback((variant: 'rdv4' | 'rdv4-bt' | 'generic') => {
+  const selectVariant = useCallback((variant: 'rdv4' | 'rdv4-bt' | 'generic' | 'pm5-standard' | 'pm5-bwm') => {
     send({ type: 'SELECT_VARIANT', variant });
   }, [send]);
 

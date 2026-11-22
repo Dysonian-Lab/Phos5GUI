@@ -15,7 +15,7 @@ interface BootLine {
 }
 
 const BOOT_LINES: BootLine[] = [
-  { text: `[=] POST..................... PHOSPHOR SYSTEMS v${APP_VERSION}`, color: 'var(--green-dim)' },
+  { text: `[=] POST..................... Phos5GUI v${APP_VERSION}`, color: 'var(--green-dim)' },
   { text: '[+] Card database............ 34 types loaded', color: 'var(--green-mid)' },
   { text: '[+] RF antenna............... calibrated', color: 'var(--green-mid)' },
   { text: '[+] USB...................... ports enumerated', color: 'var(--green-mid)' },
@@ -46,9 +46,9 @@ export function BootSequence({ onComplete }: BootSequenceProps) {
   const [, setTick] = useState(0);
   const [cursorVisible, setCursorVisible] = useState(true);
 
-  const titleText = phase >= 2 ? 'PHOSPHOR' : '';
+  const titleText = phase >= 2 ? 'Phos5GUI' : '';
   const displayedTitle = useTypewriter(titleText, 55);
-  const subtitleText = phase >= 2 ? `v${APP_VERSION} // PROXMARK3 INTERFACE` : '';
+  const subtitleText = phase >= 2 ? `v${APP_VERSION} // PM5 INTERFACE` : '';
   const displayedSubtitle = useTypewriter(
     displayedTitle === titleText ? subtitleText : '',
     18,
@@ -127,7 +127,9 @@ export function BootSequence({ onComplete }: BootSequenceProps) {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'var(--bg-void)',
+        background: 'transparent',
+        backdropFilter: 'blur(1px) brightness(0.6)',
+        WebkitBackdropFilter: 'blur(1px) brightness(0.6)',
         fontFamily: 'var(--font-mono)',
         color: 'var(--green-bright)',
       }}

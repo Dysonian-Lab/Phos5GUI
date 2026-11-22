@@ -2,7 +2,7 @@ import { useAdvanced } from '../../hooks/useAdvanced';
 import { useState } from 'react';
 
 export function FirmwareStep({ advanced }: { advanced: ReturnType<typeof useAdvanced> }) {
-  const [variant, setVariant] = useState<'rdv4' | 'rdv4-bt' | 'generic'>('rdv4');
+  const [variant, setVariant] = useState<'rdv4' | 'rdv4-bt' | 'generic' | 'pm5-standard' | 'pm5-bwm'>('rdv4');
   const [progress, setProgress] = useState<number>(0);
   const [message, setMessage] = useState<string>('Ready to flash');
   const [loading, setLoading] = useState(false);
@@ -36,11 +36,13 @@ export function FirmwareStep({ advanced }: { advanced: ReturnType<typeof useAdva
           Variant:
           <select
             value={variant}
-            onChange={(e) => setVariant(e.target.value as 'rdv4' | 'rdv4-bt' | 'generic')}
+            onChange={(e) => setVariant(e.target.value as 'rdv4' | 'rdv4-bt' | 'generic' | 'pm5-standard' | 'pm5-bwm')}
           >
             <option value="rdv4">RDV4</option>
             <option value="rdv4-bt">RDV4-BT</option>
             <option value="generic">Generic</option>
+            <option value="pm5-standard">PM5 Standard</option>
+            <option value="pm5-bwm">PM5 + BWM</option>
           </select>
         </label>
       </div>

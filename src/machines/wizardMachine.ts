@@ -74,7 +74,7 @@ export interface WizardContext {
   firmwareStatus: 'unknown' | 'matched' | 'mismatched' | 'updating' | 'updated';
   clientVersion: string | null;
   deviceFirmwareVersion: string | null;
-  hardwareVariant: 'rdv4' | 'rdv4-bt' | 'generic' | 'generic-256' | 'unknown' | null;
+  hardwareVariant: 'rdv4' | 'rdv4-bt' | 'generic' | 'generic-256' | 'pm5-standard' | 'pm5-bwm' | 'unknown' | null;
   firmwarePathExists: boolean;
   firmwareProgress: number;
   firmwareMessage: string | null;
@@ -171,7 +171,7 @@ export type WizardEvent =
   // ERROR is handled via invoke onError handlers, not dispatched directly.
   // Kept in the union for type completeness and potential future manual error injection.
   | { type: 'ERROR'; message: string; userMessage: string; recoverable: boolean; recoveryAction: RecoveryAction | null }
-  | { type: 'SELECT_VARIANT'; variant: 'rdv4' | 'rdv4-bt' | 'generic' }
+  | { type: 'SELECT_VARIANT'; variant: 'rdv4' | 'rdv4-bt' | 'generic' | 'pm5-standard' | 'pm5-bwm' }
   | { type: 'UPDATE_FIRMWARE' }
   | { type: 'SKIP_FIRMWARE' }
   | { type: 'FIRMWARE_PROGRESS'; progress: number; message: string; phase: string }
@@ -432,7 +432,7 @@ export const wizardMachine = setup({
 
     redetectingDevice: {
       after: {
-        15000: {
+        30000: {
           target: 'error',
           actions: assign({
             errorMessage: () => 'Device redetection timed out',

@@ -26,7 +26,7 @@ export function TopBar({ connected, onDisconnect }: TopBarProps) {
       }}
     >
       <div style={{ color: 'var(--green-mid)', fontWeight: 600 }}>
-        PHOSPHOR v{APP_VERSION}
+        Phos5GUI v{APP_VERSION}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <div
@@ -35,7 +35,7 @@ export function TopBar({ connected, onDisconnect }: TopBarProps) {
             fontWeight: 500,
           }}
         >
-          {connected ? '[PM3:CONNECTED]' : '[PM3:DISCONNECTED]'}
+          {connected ? '[PM5:CONNECTED]' : '[PM5:DISCONNECTED]'}
         </div>
         {connected && onDisconnect && (
           <div

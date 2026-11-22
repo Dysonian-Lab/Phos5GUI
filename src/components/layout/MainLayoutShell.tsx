@@ -27,6 +27,7 @@ import {
   PowerPanel,
   FactoryInfoPanel,
   AntennaPanel,
+  IcsDecoderPanel,
 } from '../panels';
 
 export function MainLayoutShell() {
@@ -174,6 +175,10 @@ export function MainLayoutShell() {
           <div style={{ padding: '24px', position: 'relative', zIndex: 5 }}>
             <AntennaPanel port={wizard.context.port ?? ''} />
           </div>
+        ) : null;
+      case 'ics':
+        return isPm5 ? (
+          <IcsDecoderPanel />
         ) : null;
       default:
         return null;

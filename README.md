@@ -68,3 +68,13 @@ Phos5GUI_Windows_Portable/
 ## Supported Magic Blanks
 * **LF**: T5577, EM4305, T55x7
 * **HF**: Gen1a, Gen2 (CUID), Gen3, Gen4 (GTU / GDM / USCUID)
+## iCLASS Legacy BRUTE Solver & Reverse Engineering
+- Decodes from physical printed badge ID (Card Number).
+- Dual-parity prefix scanning: differentiates 1-bit (fc1p) vs 2-bit (fc2p) leading parity boundaries.
+- Candidate selection: auto-calculates unknown Facility Code (e.g. 22-bit FC: 7874 for 23-bit CN: 1341).
+
+## iCLASS Legacy HF Writing & Read-Back Verification
+- Master key selection: HID Standard Master 0 (AEA684A6DAB23278), iCopy-X Legacy DRM Master (2020666666668888).
+- Write syntax: hf iclass wrbl --blk 7 -d <Blk7#> -k <MasterKey>
+- Read-back: hf iclass rdbl --blk 7 -k <MasterKey>
+

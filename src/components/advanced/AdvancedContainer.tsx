@@ -2,6 +2,7 @@ import { Iso14bStep } from './Iso14bStep';
 import { Iso15Step } from './Iso15Step';
 import { FelicaStep } from './FelicaStep';
 import { IclassSeStep } from './IclassSeStep';
+import { IcsDecoderPanel } from '../panels/IcsDecoderPanel';
 import { LegicStep } from './LegicStep';
 import { MfViewStep } from './MfViewStep';
 import { CalypsoStep } from './CalypsoStep';
@@ -25,7 +26,7 @@ import { useAdvanced } from '../../hooks/useAdvanced';
 export function AdvancedContainer() {
   const advanced = useAdvanced();
 
-  const [active, setActive] = React.useState<'iso14b'|'iso15'|'felica'|'iclass'|'legic'|'mfview'|'calypso'|'desfire'|'thinfilm'|'mad'|'nfc'|'mfu'|'emrtd'|'smartcard'|'antifuzz'|'t55xx'|'trace'|'script'|'firmware'|'tuning'|'antenna'>('iso14b');
+  const [active, setActive] = React.useState<'iso14b'|'iso15'|'felica'|'iclass'|'ics'|'legic'|'mfview'|'calypso'|'desfire'|'thinfilm'|'mad'|'nfc'|'mfu'|'emrtd'|'smartcard'|'antifuzz'|'t55xx'|'trace'|'script'|'firmware'|'tuning'|'antenna'>('iso14b');
 
   return (
     <div style={{ padding: '24px' }}>
@@ -35,6 +36,7 @@ export function AdvancedContainer() {
         <button onClick={() => setActive('iso15')}>15693</button>
         <button onClick={() => setActive('felica')}>Felica</button>
         <button onClick={() => setActive('iclass')}>iCLASS</button>
+        <button onClick={() => setActive('ics')}>ICS DECODER</button>
         <button onClick={() => setActive('legic')}>LEGIC</button>
         <button onClick={() => setActive('mfview')}>Mifare View</button>
         <button onClick={() => setActive('calypso')}>Calypso</button>
@@ -58,6 +60,7 @@ export function AdvancedContainer() {
       {active === 'iso15' && <Iso15Step advanced={advanced} />}
       {active === 'felica' && <FelicaStep advanced={advanced} />}
       {active === 'iclass' && <IclassSeStep advanced={advanced} />}
+      {active === 'ics' && <IcsDecoderPanel />}
       {active === 'legic' && <LegicStep advanced={advanced} />}
       {active === 'mfview' && <MfViewStep advanced={advanced} />}
       {active === 'calypso' && <CalypsoStep advanced={advanced} />}

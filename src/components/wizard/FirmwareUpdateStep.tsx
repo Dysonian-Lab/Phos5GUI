@@ -14,13 +14,15 @@ interface FirmwareUpdateStepProps {
   onUpdate: () => void;
   onSkip: () => void;
   onCancel: () => void;
-  onSelectVariant?: (variant: 'rdv4' | 'rdv4-bt' | 'generic') => void;
+  onSelectVariant?: (variant: 'rdv4' | 'rdv4-bt' | 'generic' | 'pm5-standard' | 'pm5-bwm') => void;
 }
 
-const VARIANT_OPTIONS: { id: 'rdv4' | 'rdv4-bt' | 'generic'; label: string }[] = [
+const VARIANT_OPTIONS: { id: 'rdv4' | 'rdv4-bt' | 'generic' | 'pm5-standard' | 'pm5-bwm'; label: string }[] = [
   { id: 'rdv4', label: 'PROXMARK3 RDV4' },
   { id: 'rdv4-bt', label: 'RDV4 + BLUESHARK' },
   { id: 'generic', label: 'PM3 EASY / CLONE' },
+  { id: 'pm5-standard', label: 'PROXMARK5 STANDARD' },
+  { id: 'pm5-bwm', label: 'PROXMARK5 + BWM' },
 ];
 
 const btnBase: React.CSSProperties = {
@@ -187,6 +189,77 @@ export function FirmwareUpdateStep({
   }
 
   // step === 'FirmwareOutdated' — variant known, show update/skip
+  // For PM5, allow choosing between Standard and BWM ONLY when variant is generic/unknown
+  const isPm5Generic = hardwareVariant === 'pm5' || hardwareVariant === 'unknown' || !hardwareVariant;
+  const isPm5Specific = hardwareVariant === 'pm5-standard' || hardwareVariant === 'pm5-bwm';
+  const showVariantPicker = hardwareVariant === 'unknown' || !hardwareVariant || isPm5Generic;
+
+  if (showVariantPicker) {
+    const pm5Options = [
+      { id: 'pm5-standard' as const, label: 'PROXMARK5 STANDARD' },
+      { id: 'pm5-bwm' as const, label: 'PROXMARK5 + BWM' },
+    ];
+    const options = (isPm5Generic || isPm5Specific) ? pm5Options : VARIANT_OPTIONS;
+
+    return (
+      <TerminalPanel title={isPm5Generic ? 'SELECT PM5 VARIANT' : 'SELECT HARDWARE'}>
+        <div style={{ fontSize: '13px', lineHeight: '1.8' }}>
+          <div style={{ color: 'var(--amber)', marginBottom: '12px' }}>
+            {!isPm5Generic && '[!] Firmware mismatch — hardware variant could not be detected automatically.'}
+            {isPm5Generic && '[!] Firmware version mismatch detected — select PM5 variant to flash'}
+          </div>
+          <div style={{ color: 'var(--green-dim)', fontSize: '12px', marginBottom: '16px' }}>
+            {isPm5Generic
+              ? 'Your PM5 has Battery Watchdog Management (BWM). Choose the correct variant:'
+              : 'Select your Proxmark3 model to flash the correct firmware:'}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+            {options.map((opt) => (
+              <button
+                key={opt.id}
+                onClick={() => { sfx.action(); onSelectVariant?.(opt.id); }}
+                style={{
+                  ...btnBase,
+                  padding: '10px 16px',
+                  textAlign: 'left',
+                }}
+                onMouseEnter={(e) => {
+                  sfx.hover();
+                  e.currentTarget.style.background = 'var(--green-ghost)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'var(--bg-void)';
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => { sfx.action(); onSkip(); }}
+            style={{
+              ...btnBase,
+              border: '2px solid var(--green-dim)',
+              color: 'var(--green-dim)',
+              opacity: 0.7,
+            }}
+            onMouseEnter={(e) => {
+              sfx.hover();
+              e.currentTarget.style.opacity = '1';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '0.7';
+            }}
+          >
+            SKIP
+          </button>
+        </div>
+      </TerminalPanel>
+    );
+  }
+
   return (
     <TerminalPanel title="FIRMWARE MISMATCH">
       <div style={{ fontSize: '13px', lineHeight: '1.8' }}>

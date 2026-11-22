@@ -77,9 +77,10 @@ export const connectionMachine = setup({
       // Invoke Rust backend strict version comparison
       return invoke<VersionMatchStatus>('evaluate_version_match', { port: input.port });
     }),
-    flashFirmware: fromPromise<void, ConnectionContext>(async ({ input }) => {
+    flashFirmware: fromPromise<void, ConnectionContext & { variant?: string }>(async ({ input }) => {
       if (!input.port) throw new Error('No device port available');
-      await invoke<void>('flash_pm5_complete', { port: input.port, variant: 'bwm' });
+      const variant = input.variant || 'standard';
+      await invoke<void>('flash_pm5_firmware', { port: input.port, variant });
     }),
   },
 }).createMachine({
