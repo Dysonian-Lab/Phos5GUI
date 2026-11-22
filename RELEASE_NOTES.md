@@ -593,3 +593,9 @@ portable/
 - 21 Advanced tab panels functional.
 - Verified live on an iCopy-X: MIFARE Classic 1K (SAK 08) detected, `hf search`,
   `hf mf autopwn` and the MF View panel all working.
+
+## v2.2.2 - ICS Decoder Advanced Features
+- iCLASS Legacy BRUTE solver with dual-parity decoding.
+- Block 7 write + read-back verification with selectable master key.
+- Fixed double-write / No tag found bug (single key per attempt).
+

@@ -78,3 +78,9 @@ Phos5GUI_Windows_Portable/
 - Write syntax: hf iclass wrbl --blk 7 -d <Blk7#> -k <MasterKey>
 - Read-back: hf iclass rdbl --blk 7 -k <MasterKey>
 
+
+### iCLASS Legacy BRUTE Solver Notes
+- Default master key is HID Standard (AEA684A6DAB23278). For iCopy cards, select iCopy-X DRM Master (2020666666668888) in the dropdown before writing.
+- No auto-fallback: one key per click; wrong key = change dropdown and click again.
+- -k takes a master key; firmware diversifies it internally via CSN. Do not feed a diversified key.
+
