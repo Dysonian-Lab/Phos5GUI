@@ -1,4 +1,4 @@
-﻿use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 /// Result of comparing device firmware version against the client's expected version.
 ///
@@ -10,19 +10,11 @@ pub enum VersionMatchStatus {
     /// Device firmware version matches the client's expected version.
     Matched,
     /// Device firmware is older than what the client expects.
-    DeviceOutdated {
-        device_ver: u8,
-        client_ver: u8,
-    },
+    DeviceOutdated { device_ver: u8, client_ver: u8 },
     /// Device firmware is newer than this desktop client.
-    ClientOutdated {
-        device_ver: u8,
-        client_ver: u8,
-    },
+    ClientOutdated { device_ver: u8, client_ver: u8 },
     /// Version could not be determined (probe failed, timeout, etc.).
-    ProbeFailed {
-        reason: String,
-    },
+    ProbeFailed { reason: String },
 }
 
 /// Expected capabilities version of the bundled/patched PM5 client.

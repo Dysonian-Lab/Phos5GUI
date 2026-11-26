@@ -25,7 +25,8 @@ pub fn parse_fpga_status(raw_bytes: &[u8]) -> Option<FpgaStatus> {
     }
 
     let bitstream_loaded = raw_bytes[0] != 0;
-    let clock_speed_hz = u32::from_le_bytes([raw_bytes[1], raw_bytes[2], raw_bytes[3], raw_bytes[4]]);
+    let clock_speed_hz =
+        u32::from_le_bytes([raw_bytes[1], raw_bytes[2], raw_bytes[3], raw_bytes[4]]);
     let pwm_low_count = u16::from_le_bytes([raw_bytes[5], raw_bytes[6]]);
     let fpga_version = String::from_utf8(raw_bytes[7..].to_vec()).ok()?;
 
@@ -89,10 +90,7 @@ mod tests {
     fn test_parse_fpga_status_invalid_utf8_version() {
         // Valid header but invalid UTF-8 in version bytes
         let raw = [
-            0x01,
-            0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00,
-            0xFF, 0xFE, // invalid UTF-8
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFE, // invalid UTF-8
         ];
 
         assert!(parse_fpga_status(&raw).is_none());

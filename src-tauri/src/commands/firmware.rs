@@ -62,7 +62,15 @@ pub struct FirmwareProgress {
 // Validation
 // ---------------------------------------------------------------------------
 
-const VALID_VARIANTS: &[&str] = &["rdv4", "rdv4-bt", "generic", "generic-256"];
+const VALID_VARIANTS: &[&str] = &[
+    "rdv4",
+    "rdv4-bt",
+    "generic",
+    "generic-256",
+    "pm5",
+    "pm5-standard",
+    "pm5-bwm",
+];
 
 static PORT_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(COM[1-9]\d*|/dev/tty(ACM|USB)\d{1,2}|/dev/tty\.usbmodem\w+)$")
@@ -83,14 +91,10 @@ pub async fn evaluate_version_match(
         .await
         .map_err(|e| e.to_string())?;
 
-    // When Layer 2 `hw version` succeeded (exit code 0) but capabilities_version
-    // couldn't be extracted from stdout (direct serial probe timed out), we must
-    // still check for commit mismatch by parsing the hw version output directly.
-    // Returning `Matched` here would suppress the DeviceOutdated modal and the
-    // firmware update flow even when the device firmware is outdated.
-    if probe_result.capabilities_version == 0
-        && probe_result.method == ProbeMethod::StderrScraping
-    {
+    // When capabilities_version is 0 (unknown), try to compare commits via hw version output.
+    // This handles PM5 where direct serial probe may succeed but not extract version,
+    // or Layer 2 fallback succeeds but doesn't provide version number.
+    if probe_result.capabilities_version == 0 {
         let hw_output = match connection::run_command(&app, &port, "hw version").await {
             Ok(output) => output,
             Err(e) => {
@@ -143,10 +147,26 @@ pub async fn flash_pm5_firmware(
         .resource_dir()
         .map_err(|e| format!("Failed to resolve resource dir: {}", e))?;
 
-    let candidates = [
-        resource_dir.join("firmware").join("pm5").join(&variant),
-        resource_dir.join("firmware").join(&variant),
-    ];
+    // Search order:
+    // 1. Executable-relative (portable mode — user drops firmware next to phos5gui.exe)
+    // 2. Bundled resource_dir (installed mode)
+    // 3. Parent of resource_dir (dev mode fallback)
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(PathBuf::from));
+    let resource_parent = resource_dir.parent().map(PathBuf::from);
+
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Some(ref dir) = exe_dir {
+        candidates.push(dir.join("firmware").join("pm5").join(&variant));
+        candidates.push(dir.join("firmware").join(&variant));
+    }
+    candidates.push(resource_dir.join("firmware").join("pm5").join(&variant));
+    candidates.push(resource_dir.join("firmware").join(&variant));
+    if let Some(ref dir) = resource_parent {
+        candidates.push(dir.join("firmware").join("pm5").join(&variant));
+        candidates.push(dir.join("firmware").join(&variant));
+    }
 
     let (bootrom_path, fullimage_path) = candidates
         .iter()
@@ -169,7 +189,7 @@ pub async fn flash_pm5_firmware(
     let bootrom_path: PathBuf = strip_win_prefix(bootrom_path);
     let fullimage_path: PathBuf = strip_win_prefix(fullimage_path);
 
-    flasher::bootloader::flash_via_client_flasher(&port, &bootrom_path, &fullimage_path)
+    flasher::bootloader::flash_via_client_flasher(&app, &port, &bootrom_path, &fullimage_path)
         .await
         .map_err(|e| e.to_string())
 }
@@ -211,14 +231,83 @@ pub async fn check_firmware_version(
         }
     };
 
-    let (matched, client_version, device_firmware_version, hardware_variant) = if let Some(info) = hw_info {
-        (info.versions_match, info.client_version, info.os_version, info.hardware_variant)
-    } else {
-        // No hw version output, use probe data
-        (false, "bundled".to_string(), format!("v{}", probe_result.capabilities_version), "pm5".to_string())
-    };
+    let (matched, client_version, device_firmware_version, hardware_variant) =
+        if let Some(info) = hw_info {
+            (
+                info.versions_match,
+                info.client_version,
+                info.os_version,
+                info.hardware_variant,
+            )
+        } else {
+            // No hw version output, use probe data
+            (
+                false,
+                "bundled".to_string(),
+                format!("v{}", probe_result.capabilities_version),
+                "pm5".to_string(),
+            )
+        };
 
-    let fw_exists = firmware_file_exists(&app, &hardware_variant);
+    // PM5 device — resolve firmware path existence via pm5 manifest
+    let fw_exists = if hardware_variant == "pm5" {
+        // Check both PM5 variant directories, including executable-relative
+        // (portable mode where user drops firmware next to phos5gui.exe)
+        let resource_dir = app.path().resource_dir().ok();
+        let exe_dir = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(PathBuf::from));
+        let resource_parent = resource_dir
+            .as_ref()
+            .and_then(|d| d.parent().map(PathBuf::from));
+
+        let mut candidates: Vec<PathBuf> = Vec::new();
+        if let Some(ref dir) = exe_dir {
+            candidates.push(
+                dir.join("firmware")
+                    .join("pm5")
+                    .join("standard")
+                    .join("fullimage.elf"),
+            );
+            candidates.push(
+                dir.join("firmware")
+                    .join("pm5")
+                    .join("bwm")
+                    .join("fullimage.elf"),
+            );
+        }
+        if let Some(ref dir) = resource_dir {
+            candidates.push(
+                dir.join("firmware")
+                    .join("pm5")
+                    .join("standard")
+                    .join("fullimage.elf"),
+            );
+            candidates.push(
+                dir.join("firmware")
+                    .join("pm5")
+                    .join("bwm")
+                    .join("fullimage.elf"),
+            );
+        }
+        if let Some(ref dir) = resource_parent {
+            candidates.push(
+                dir.join("firmware")
+                    .join("pm5")
+                    .join("standard")
+                    .join("fullimage.elf"),
+            );
+            candidates.push(
+                dir.join("firmware")
+                    .join("pm5")
+                    .join("bwm")
+                    .join("fullimage.elf"),
+            );
+        }
+        candidates.iter().any(|p| p.exists())
+    } else {
+        firmware_file_exists(&app, &hardware_variant)
+    };
 
     Ok(FirmwareCheckResult {
         matched,
@@ -251,9 +340,10 @@ pub async fn flash_firmware(
 ) -> Result<(), AppError> {
     // Reject if a flash is already running
     {
-        let lock = flash_state.child.lock().map_err(|e| {
-            AppError::CommandFailed(format!("Flash state lock poisoned: {}", e))
-        })?;
+        let lock = flash_state
+            .child
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("Flash state lock poisoned: {}", e)))?;
         if lock.is_some() {
             return Err(AppError::CommandFailed(
                 "A firmware flash is already in progress".into(),
@@ -274,10 +364,29 @@ pub async fn flash_firmware(
         )));
     }
 
+    // PM5 variants use the PM5 flash flow (bootrom + fullimage via USB-CDC flasher)
+    if hardware_variant == "pm5-standard"
+        || hardware_variant == "pm5-bwm"
+        || hardware_variant == "pm5"
+    {
+        let variant = if hardware_variant == "pm5-standard" {
+            "standard"
+        } else {
+            // "pm5-bwm" and bare "pm5" both route to BWM variant.
+            // BWM firmware is required for PM5 battery safety — non-BWM
+            // firmware can damage the battery management circuit.
+            "bwm"
+        };
+        return flash_pm5_firmware(app, port, variant.to_string())
+            .await
+            .map_err(|e| AppError::CommandFailed(e));
+    }
+
     // Resolve firmware path from bundled resources
-    let resource_dir = app.path().resource_dir().map_err(|e| {
-        AppError::CommandFailed(format!("Failed to resolve resource dir: {}", e))
-    })?;
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|e| AppError::CommandFailed(format!("Failed to resolve resource dir: {}", e)))?;
     let fw_path = resource_dir
         .join("firmware")
         .join(&hardware_variant)
@@ -401,11 +510,7 @@ pub async fn flash_firmware(
             message: if success {
                 "Firmware flash complete!".into()
             } else if !stderr.is_empty() {
-                stderr
-                    .lines()
-                    .last()
-                    .unwrap_or("Flash failed")
-                    .to_string()
+                stderr.lines().last().unwrap_or("Flash failed").to_string()
             } else {
                 format!("Flash failed (exit code: {:?})", output.status.code())
             },
@@ -419,9 +524,10 @@ pub async fn flash_firmware(
 #[tauri::command]
 pub async fn cancel_flash(flash_state: State<'_, FlashState>) -> Result<(), AppError> {
     let child = {
-        let mut lock = flash_state.child.lock().map_err(|e| {
-            AppError::CommandFailed(format!("Flash state lock poisoned: {}", e))
-        })?;
+        let mut lock = flash_state
+            .child
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("Flash state lock poisoned: {}", e)))?;
         lock.take()
     };
 
@@ -444,6 +550,49 @@ fn firmware_file_exists(app: &AppHandle, variant: &str) -> bool {
     if !VALID_VARIANTS.contains(&variant) {
         return false;
     }
+    // PM5 variants live under firmware/pm5/{standard|bwm}/fullimage.elf
+    if variant == "pm5-standard" || variant == "pm5-bwm" || variant == "pm5" {
+        let sub = if variant == "pm5-standard" {
+            "standard"
+        } else {
+            "bwm"
+        };
+        // Check multiple locations: executable-relative (portable), resource_dir (installed), parent (dev)
+        let exe_dir = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(PathBuf::from));
+        let resource_dir = app.path().resource_dir().ok();
+        let resource_parent = resource_dir
+            .as_ref()
+            .and_then(|d| d.parent().map(PathBuf::from));
+
+        let mut candidates: Vec<PathBuf> = Vec::new();
+        if let Some(ref dir) = exe_dir {
+            candidates.push(
+                dir.join("firmware")
+                    .join("pm5")
+                    .join(sub)
+                    .join("fullimage.elf"),
+            );
+        }
+        if let Some(ref dir) = resource_dir {
+            candidates.push(
+                dir.join("firmware")
+                    .join("pm5")
+                    .join(sub)
+                    .join("fullimage.elf"),
+            );
+        }
+        if let Some(ref dir) = resource_parent {
+            candidates.push(
+                dir.join("firmware")
+                    .join("pm5")
+                    .join(sub)
+                    .join("fullimage.elf"),
+            );
+        }
+        return candidates.iter().any(|p| p.exists());
+    }
     app.path()
         .resource_dir()
         .map(|dir| {
@@ -454,4 +603,3 @@ fn firmware_file_exists(app: &AppHandle, variant: &str) -> bool {
         })
         .unwrap_or(false)
 }
-

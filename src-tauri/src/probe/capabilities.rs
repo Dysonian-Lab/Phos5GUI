@@ -38,9 +38,7 @@ impl CapabilitiesStruct {
             }
         };
         // Read a bool flag at `offset` when present.
-        let flag_at = |offset: usize| -> bool {
-            data.get(offset).is_some_and(|b| *b != 0)
-        };
+        let flag_at = |offset: usize| -> bool { data.get(offset).is_some_and(|b| *b != 0) };
 
         Some(Self {
             version,

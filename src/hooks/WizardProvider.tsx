@@ -93,7 +93,7 @@ export interface UseWizardReturn {
   /** Plain Back: previous step, keeping the device connection */
   back: () => Promise<void>;
   /** Load a saved card into the wizard as if it was just scanned */
-  loadSavedCard: (card: { frequency: string; cardType: string; uid: string; raw: string; decoded: Record<string, string>; cloneable: boolean; recommendedBlank: string }) => Promise<void>;
+  loadSavedCard: (card: { frequency: string; cardType: string; uid: string; raw: string; decoded: Record<string, string>; cloneable: boolean; recommendedBlank: string; dumpFile?: string }) => Promise<void>;
   /** Re-detect blank card after erase (BlankDetected -> WaitingForBlank) */
   reDetectBlank: () => Promise<void>;
   /** Start HF key recovery / dump process (Classic: autopwn, UL/NTAG/iCLASS: dump) */
@@ -419,6 +419,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     decoded: Record<string, string>;
     cloneable: boolean;
     recommendedBlank: string;
+    dumpFile?: string;
   }) => {
     try {
       await invoke<WizardState>('wizard_action', {
@@ -432,6 +433,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
             decoded: card.decoded,
             cloneable: card.cloneable,
             recommended_blank: card.recommendedBlank,
+            dump_file: card.dumpFile,
           },
         },
       });
@@ -439,7 +441,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
         type: 'LOAD_SAVED_CARD',
         frequency: card.frequency as WizCtx['frequency'] & string,
         cardType: card.cardType as WizCtx['cardType'] & string,
-        cardData: { uid: card.uid, raw: card.raw, decoded: card.decoded },
+        cardData: { uid: card.uid, raw: card.raw, decoded: card.decoded, dump_file: card.dumpFile },
         cloneable: card.cloneable,
         recommendedBlank: card.recommendedBlank as WizCtx['recommendedBlank'] & string,
       });

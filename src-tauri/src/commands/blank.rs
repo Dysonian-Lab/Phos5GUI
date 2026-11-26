@@ -23,9 +23,9 @@ pub async fn detect_blank(
 ) -> Result<WizardState, AppError> {
     // Validate we're in WaitingForBlank and extract expected blank type
     let expected_blank = {
-        let m = machine.lock().map_err(|e| {
-            AppError::CommandFailed(format!("State lock poisoned: {}", e))
-        })?;
+        let m = machine
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
         match &m.current {
             WizardState::WaitingForBlank { expected_blank } => expected_blank.clone(),
             _ => {
@@ -63,7 +63,11 @@ pub async fn detect_blank(
     logging::line(&format!(
         "Outcome             : {}",
         match &result {
-            Ok(WizardState::BlankDetected { blank_type, ready_to_write, .. }) => format!(
+            Ok(WizardState::BlankDetected {
+                blank_type,
+                ready_to_write,
+                ..
+            }) => format!(
                 "blank DETECTED as {:?} (ready_to_write={})",
                 blank_type, ready_to_write
             ),
@@ -92,27 +96,25 @@ async fn detect_t5577(
         // would discard the "[+] Chipset... T55xx" line and report "No tag found"
         // for the card we just detected. The Err arm therefore only fires for a
         // genuine spawn failure or timeout, not for "found an unclassified tag".
-        let existing_data_type =
-            match connection::run_search_command(app, port, "lf search").await {
-                Ok(search_output) => {
-                    output_parser::parse_lf_search(&search_output)
-                        .map(|(card_type, _)| format!("{:?}", card_type))
-                }
-                Err(_) => None,
-            };
+        let existing_data_type = match connection::run_search_command(app, port, "lf search").await
+        {
+            Ok(search_output) => output_parser::parse_lf_search(&search_output)
+                .map(|(card_type, _)| format!("{:?}", card_type)),
+            Err(_) => None,
+        };
 
-        let mut m = machine.lock().map_err(|e| {
-            AppError::CommandFailed(format!("State lock poisoned: {}", e))
-        })?;
+        let mut m = machine
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
         m.transition(WizardAction::BlankReady {
             blank_type: BlankType::T5577,
             existing_data_type,
         })?;
         Ok(m.current.clone())
     } else {
-        let mut m = machine.lock().map_err(|e| {
-            AppError::CommandFailed(format!("State lock poisoned: {}", e))
-        })?;
+        let mut m = machine
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
         m.transition(WizardAction::ReportError {
             message: "T5577 blank not detected".to_string(),
             user_message: "No T5577 blank found. Place blank card on the reader and try again."
@@ -163,36 +165,37 @@ async fn detect_em4305(
         // anything else means the chip already carries settings. The read needs
         // the `lf t55xx detect` prelude, so it goes through the memory helper.
         let existing_data_type = match command_builder::build_t55xx_read(0) {
-            Ok(read_cmd) => match connection::run_t55xx_memory_command(app, port, &read_cmd).await {
-                Ok(out) => match output_parser::parse_t55xx_read_block(&out) {
-                    // All-zero block 0 is a factory blank.
-                    Some(hex) if hex.chars().all(|c| c == '0') => None,
-                    Some(_) => Some("T55xx (configured)".to_string()),
-                    // Read produced nothing usable -- do NOT claim "blank".
-                    None => None,
-                },
-                Err(_) => None,
-            },
+            Ok(read_cmd) => {
+                match connection::run_t55xx_memory_command(app, port, &read_cmd).await {
+                    Ok(out) => match output_parser::parse_t55xx_read_block(&out) {
+                        // All-zero block 0 is a factory blank.
+                        Some(hex) if hex.chars().all(|c| c == '0') => None,
+                        Some(_) => Some("T55xx (configured)".to_string()),
+                        // Read produced nothing usable -- do NOT claim "blank".
+                        None => None,
+                    },
+                    Err(_) => None,
+                }
+            }
             Err(_) => None,
         };
 
-        let mut m = machine.lock().map_err(|e| {
-            AppError::CommandFailed(format!("State lock poisoned: {}", e))
-        })?;
+        let mut m = machine
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
         m.transition(WizardAction::BlankReady {
             blank_type: BlankType::EM4305,
             existing_data_type,
         })?;
         Ok(m.current.clone())
     } else {
-        let mut m = machine.lock().map_err(|e| {
-            AppError::CommandFailed(format!("State lock poisoned: {}", e))
-        })?;
+        let mut m = machine
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
         m.transition(WizardAction::ReportError {
             message: "EM4305 blank not detected".to_string(),
-            user_message:
-                "No EM4305 blank found. Place blank card on the reader and try again."
-                    .to_string(),
+            user_message: "No EM4305 blank found. Place blank card on the reader and try again."
+                .to_string(),
             recoverable: true,
             recovery_action: Some(RecoveryAction::Retry),
         })?;
@@ -232,17 +235,16 @@ async fn detect_magic_mifare(
     expected_blank: BlankType,
 ) -> Result<WizardState, AppError> {
     // Step 1: Check if any HF card is present via `hf 14a info`
-    let card_present = match connection::run_command(app, port, command_builder::build_hf_14a_info())
-        .await
-    {
-        Ok(output) => output_parser::is_hf_card_present(&output),
-        Err(_) => false,
-    };
+    let card_present =
+        match connection::run_command(app, port, command_builder::build_hf_14a_info()).await {
+            Ok(output) => output_parser::is_hf_card_present(&output),
+            Err(_) => false,
+        };
 
     if !card_present {
-        let mut m = machine.lock().map_err(|e| {
-            AppError::CommandFailed(format!("State lock poisoned: {}", e))
-        })?;
+        let mut m = machine
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
         m.transition(WizardAction::ReportError {
             message: "No HF card detected".to_string(),
             user_message: "No card found. Place the magic blank on the reader and try again."
@@ -254,12 +256,11 @@ async fn detect_magic_mifare(
     }
 
     // Step 2: Detect magic generation via `hf mf info`
-    let detected_gen = match connection::run_command(app, port, command_builder::build_hf_mf_info())
-        .await
-    {
-        Ok(output) => output_parser::parse_magic_detection(&output),
-        Err(_) => None,
-    };
+    let detected_gen =
+        match connection::run_command(app, port, command_builder::build_hf_mf_info()).await {
+            Ok(output) => output_parser::parse_magic_detection(&output),
+            Err(_) => None,
+        };
 
     let expected_gen = expected_generation(&expected_blank);
 
@@ -268,9 +269,9 @@ async fn detect_magic_mifare(
             // Perfect match — detected generation matches expected.
             // Check if card already has data written to it.
             let existing_data = check_mifare_data(app, port, gen).await;
-            let mut m = machine.lock().map_err(|e| {
-                AppError::CommandFailed(format!("State lock poisoned: {}", e))
-            })?;
+            let mut m = machine
+                .lock()
+                .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
             m.transition(WizardAction::BlankReady {
                 blank_type: expected_blank,
                 existing_data_type: existing_data,
@@ -282,12 +283,18 @@ async fn detect_magic_mifare(
             // Accept the detected type instead — user placed a different magic card.
             let existing_data = check_mifare_data(app, port, gen).await;
             let actual_blank = generation_to_blank(gen);
-            let mut m = machine.lock().map_err(|e| {
-                AppError::CommandFailed(format!("State lock poisoned: {}", e))
-            })?;
+            let mut m = machine
+                .lock()
+                .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
             let data_msg = match existing_data {
-                Some(msg) => Some(format!("{} (detected {:?}, expected {:?})", msg, actual_blank, expected_blank)),
-                None => Some(format!("Detected: {:?} (expected {:?})", actual_blank, expected_blank)),
+                Some(msg) => Some(format!(
+                    "{} (detected {:?}, expected {:?})",
+                    msg, actual_blank, expected_blank
+                )),
+                None => Some(format!(
+                    "Detected: {:?} (expected {:?})",
+                    actual_blank, expected_blank
+                )),
             };
             m.transition(WizardAction::BlankReady {
                 blank_type: actual_blank.clone(),
@@ -298,9 +305,9 @@ async fn detect_magic_mifare(
         None => {
             // Card present but no magic detected — could be genuine MIFARE.
             // Still allow proceeding (some magic cards aren't detected by `hf mf info`).
-            let mut m = machine.lock().map_err(|e| {
-                AppError::CommandFailed(format!("State lock poisoned: {}", e))
-            })?;
+            let mut m = machine
+                .lock()
+                .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
             m.transition(WizardAction::BlankReady {
                 blank_type: expected_blank,
                 existing_data_type: Some("No magic detected — card may be genuine".to_string()),
@@ -314,11 +321,7 @@ async fn detect_magic_mifare(
 /// For Gen1a/Gen4GDM: uses `hf mf cgetblk` (backdoor, no key needed).
 /// For Gen2/Gen3/Gen4GTU: uses `hf mf rdbl` with default key.
 /// Returns `Some("MIFARE Classic")` if data found, `None` if card appears blank.
-async fn check_mifare_data(
-    app: &AppHandle,
-    port: &str,
-    gen: &MagicGeneration,
-) -> Option<String> {
+async fn check_mifare_data(app: &AppHandle, port: &str, gen: &MagicGeneration) -> Option<String> {
     // Read block 4 (first data block of sector 1 — avoids manufacturer block 0)
     let cmd = match gen {
         MagicGeneration::Gen1a | MagicGeneration::Gen4GDM => {
@@ -368,7 +371,7 @@ fn has_nonzero_block_data(output: &str) -> bool {
         let data_part = if let Some(idx) = trimmed.find('|') {
             &trimmed[idx + 1..]
         } else {
-            continue
+            continue;
         };
         // Parse space-separated hex bytes
         let bytes: Vec<u8> = data_part
@@ -395,7 +398,8 @@ async fn detect_magic_ultralight(
         Ok(output) => {
             // Check if any UL/NTAG card responded
             let clean = output_parser::strip_ansi(&output).to_lowercase();
-            let card_found = clean.contains("uid") || clean.contains("ultralight") || clean.contains("ntag");
+            let card_found =
+                clean.contains("uid") || clean.contains("ultralight") || clean.contains("ntag");
 
             if card_found {
                 let existing_data_type = if output_parser::is_magic_ultralight(&output) {
@@ -404,22 +408,23 @@ async fn detect_magic_ultralight(
                     Some("No magic markers detected — card may be genuine".to_string())
                 };
 
-                let mut m = machine.lock().map_err(|e| {
-                    AppError::CommandFailed(format!("State lock poisoned: {}", e))
-                })?;
+                let mut m = machine
+                    .lock()
+                    .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
                 m.transition(WizardAction::BlankReady {
                     blank_type: BlankType::MagicUltralight,
                     existing_data_type,
                 })?;
                 Ok(m.current.clone())
             } else {
-                let mut m = machine.lock().map_err(|e| {
-                    AppError::CommandFailed(format!("State lock poisoned: {}", e))
-                })?;
+                let mut m = machine
+                    .lock()
+                    .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
                 m.transition(WizardAction::ReportError {
                     message: "No Ultralight/NTAG card detected".to_string(),
-                    user_message: "No Ultralight/NTAG card found. Place blank on the reader and try again."
-                        .to_string(),
+                    user_message:
+                        "No Ultralight/NTAG card found. Place blank on the reader and try again."
+                            .to_string(),
                     recoverable: true,
                     recovery_action: Some(RecoveryAction::Retry),
                 })?;
@@ -427,13 +432,14 @@ async fn detect_magic_ultralight(
             }
         }
         Err(_) => {
-            let mut m = machine.lock().map_err(|e| {
-                AppError::CommandFailed(format!("State lock poisoned: {}", e))
-            })?;
+            let mut m = machine
+                .lock()
+                .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
             m.transition(WizardAction::ReportError {
                 message: "HF command failed".to_string(),
-                user_message: "No Ultralight/NTAG card found. Place blank on the reader and try again."
-                    .to_string(),
+                user_message:
+                    "No Ultralight/NTAG card found. Place blank on the reader and try again."
+                        .to_string(),
                 recoverable: true,
                 recovery_action: Some(RecoveryAction::Retry),
             })?;
@@ -456,18 +462,18 @@ async fn detect_iclass_blank(
     };
 
     if detected {
-        let mut m = machine.lock().map_err(|e| {
-            AppError::CommandFailed(format!("State lock poisoned: {}", e))
-        })?;
+        let mut m = machine
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
         m.transition(WizardAction::BlankReady {
             blank_type: BlankType::IClassBlank,
             existing_data_type: None,
         })?;
         Ok(m.current.clone())
     } else {
-        let mut m = machine.lock().map_err(|e| {
-            AppError::CommandFailed(format!("State lock poisoned: {}", e))
-        })?;
+        let mut m = machine
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
         m.transition(WizardAction::ReportError {
             message: "No iCLASS card detected".to_string(),
             user_message: "No iCLASS card found. Place blank on the reader and try again."

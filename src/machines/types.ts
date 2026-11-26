@@ -37,10 +37,33 @@ export type CardType =
   | 'MifareUltralight'
   | 'NTAG'
   | 'DESFire'
-  | 'IClass';
+  | 'IClass'
+  // New Phase 0 variants
+  | 'Hitag2'
+  | 'PaxtonNet2'
+  | 'PaxtonSwitch2'
+  | 'Topaz'
+  | 'ISO14443B'
+  | 'ISO15693ICODE'
+  | 'ISO15693ST'
+  | 'Legic'
+  | 'Felica'
+  | 'MifareClassicMini'
+  | 'MifareClassicPlus2K'
+  | 'MifareClassicPossible'
+  | 'MifareUltralightC'
+  | 'MifareUltralightEV1'
+  | 'NTAG213'
+  | 'NTAG215'
+  | 'NTAG216'
+  | 'IClassElite'
+  | 'IClassSE'
+  | 'EM4305'
+  | 'T55xx';
 
 export type BlankType =
   | 'T5577'
+  | 'T55xx'
   | 'EM4305'
   | 'MagicMifareGen1a'
   | 'MagicMifareGen2'
@@ -67,6 +90,17 @@ export interface CardData {
   uid: string;
   raw: string;
   decoded: Record<string, string>;
+  found?: boolean;
+  subtype?: string;
+  data?: string;
+  can_read?: boolean;
+  can_write?: boolean;
+  can_emulate?: boolean;
+  recommended_blank?: BlankType;
+  dump_file?: string;
+  keys_found?: number;
+  read_error?: string;
+  non_cloneable_reason?: string;
 }
 
 export interface CardSummary {

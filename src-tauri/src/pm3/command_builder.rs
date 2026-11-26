@@ -57,6 +57,10 @@ fn validate_hid_format(format: &str) -> bool {
 // Device / search commands
 // ---------------------------------------------------------------------------
 
+pub fn build_lf_sim(uid: &str) -> String {
+    format!("lf sim {}", uid)
+}
+
 pub fn build_lf_search() -> &'static str {
     "lf search"
 }
@@ -693,7 +697,27 @@ pub fn build_clone_command(
         | CardType::MifareUltralight
         | CardType::NTAG
         | CardType::DESFire
-        | CardType::IClass => None,
+        | CardType::IClass
+        | CardType::MifareClassicMini
+        | CardType::MifareClassicPlus2K
+        | CardType::MifareClassicPossible
+        | CardType::MifareUltralightC
+        | CardType::MifareUltralightEV1
+        | CardType::NTAG213
+        | CardType::NTAG215
+        | CardType::NTAG216
+        | CardType::IClassElite
+        | CardType::IClassSE
+        | CardType::ISO15693ICODE
+        | CardType::ISO15693ST
+        | CardType::Topaz
+        | CardType::ISO14443B
+        | CardType::Legic
+        | CardType::Felica
+        | CardType::Hitag2
+        | CardType::PaxtonNet2
+        | CardType::PaxtonSwitch2 => None,
+        _ => None,
     }
 }
 
@@ -947,6 +971,10 @@ pub fn build_hf_felica_sim(dump_path: &str) -> String {
 // ---------------------------------------------------------------------------
 
 /// `hf iclass legbrute` — LEGIC brute-force key recovery (NEON/AVX2/AVX-512).
+pub fn build_hf_iclass_sim(dump_path: &str) -> String {
+    format!("hf iclass sim -f {}", dump_path)
+}
+
 pub fn build_hf_iclass_legbrute() -> &'static str {
     "hf iclass legbrute"
 }

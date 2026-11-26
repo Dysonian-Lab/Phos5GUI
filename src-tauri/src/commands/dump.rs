@@ -39,11 +39,15 @@ pub async fn list_dump_files(app: AppHandle) -> Result<Vec<DumpFileEntry>, AppEr
                     Ok(m) => m,
                     Err(_) => continue,
                 };
-                let modified = meta.modified().ok().and_then(|t| {
-                    t.duration_since(std::time::UNIX_EPOCH)
-                        .ok()
-                        .map(|d| d.as_millis() as u64)
-                }).unwrap_or(0);
+                let modified = meta
+                    .modified()
+                    .ok()
+                    .and_then(|t| {
+                        t.duration_since(std::time::UNIX_EPOCH)
+                            .ok()
+                            .map(|d| d.as_millis() as u64)
+                    })
+                    .unwrap_or(0);
                 let size_bytes = meta.len();
                 seen.push(DumpFileEntry {
                     name: name.to_string(),

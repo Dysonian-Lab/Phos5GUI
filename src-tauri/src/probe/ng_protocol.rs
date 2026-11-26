@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 
-use serialport::SerialPort;
 use serde::Serialize;
+use serialport::SerialPort;
 use tokio::sync::Mutex as AsyncMutex;
 use tokio::time::sleep;
 
@@ -29,7 +29,9 @@ static SERIAL_PORT_LOCKS: LazyLock<Mutex<HashMap<String, Arc<AsyncMutex<()>>>>> 
 /// lock returned here, so a client spawn and a raw serial query can never touch
 /// the same COM port at once (Windows `ERROR_ACCESS_DENIED`).
 pub fn port_serial_lock(port: &str) -> Arc<AsyncMutex<()>> {
-    let mut map = SERIAL_PORT_LOCKS.lock().expect("serial port lock map poisoned");
+    let mut map = SERIAL_PORT_LOCKS
+        .lock()
+        .expect("serial port lock map poisoned");
     map.entry(port.to_string())
         .or_insert_with(|| Arc::new(AsyncMutex::new(())))
         .clone()
@@ -90,9 +92,9 @@ const PING_PAYLOAD_LEN: usize = 32;
 #[repr(C, packed)]
 #[derive(Clone, Copy, Debug)]
 struct CommandPreamble {
-    magic: u32,   // 0x61334d50 "PM3a"
-    len_ng: u16,  // bits 0-14: payload length, bit 15: ng flag
-    cmd: u16,     // command code
+    magic: u32,  // 0x61334d50 "PM3a"
+    len_ng: u16, // bits 0-14: payload length, bit 15: ng flag
+    cmd: u16,    // command code
 }
 
 #[repr(C, packed)]
@@ -104,11 +106,11 @@ struct CommandPostamble {
 #[repr(C, packed)]
 #[derive(Clone, Copy, Debug)]
 struct ResponsePreamble {
-    magic: u32,   // 0x62334d50 "PM3b"
-    len_ng: u16,  // bits 0-14: payload length, bit 15: ng flag
-    status: i8,   // PM3_SUCCESS=0, ...
+    magic: u32,  // 0x62334d50 "PM3b"
+    len_ng: u16, // bits 0-14: payload length, bit 15: ng flag
+    status: i8,  // PM3_SUCCESS=0, ...
     reason: i8,
-    cmd: u16,     // echoed command code
+    cmd: u16, // echoed command code
 }
 
 #[repr(C, packed)]
@@ -117,7 +119,7 @@ struct ResponsePostamble {
     crc: u16,
 }
 
-const COMMAND_PREAMBLE_LEN: usize = 8;  // 4 + 2 + 2
+const COMMAND_PREAMBLE_LEN: usize = 8; // 4 + 2 + 2
 const RESPONSE_PREAMBLE_LEN: usize = 10; // 4 + 2 + 1 + 1 + 2
 const POSTAMBLE_LEN: usize = 2;
 
@@ -198,8 +200,9 @@ pub fn build_ng_frame(cmd: u16, payload: &[u8]) -> Vec<u8> {
 pub fn read_ng_response(port: &mut dyn SerialPort) -> Result<NgResponse, AppError> {
     // Preamble.
     let mut pre = [0u8; RESPONSE_PREAMBLE_LEN];
-    port.read_exact(&mut pre)
-        .map_err(|e| AppError::CommandFailed(format!("Failed to read NG response preamble: {e}")))?;
+    port.read_exact(&mut pre).map_err(|e| {
+        AppError::CommandFailed(format!("Failed to read NG response preamble: {e}"))
+    })?;
 
     let magic = u32::from_le_bytes([pre[0], pre[1], pre[2], pre[3]]);
     if magic != RESPONSE_MAGIC {
@@ -222,12 +225,12 @@ pub fn read_ng_response(port: &mut dyn SerialPort) -> Result<NgResponse, AppErro
 
     // Postamble CRC.
     let mut post = [0u8; POSTAMBLE_LEN];
-    port.read_exact(&mut post)
-        .map_err(|e| AppError::CommandFailed(format!("Failed to read NG response postamble: {e}")))?;
+    port.read_exact(&mut post).map_err(|e| {
+        AppError::CommandFailed(format!("Failed to read NG response postamble: {e}"))
+    })?;
     let crc = u16::from_le_bytes([post[0], post[1]]);
 
-    let expected_crc =
-        crc16(&[&pre[..], &data].concat());
+    let expected_crc = crc16(&[&pre[..], &data].concat());
     if crc != POSTAMBLE_MAGIC && crc != expected_crc {
         return Err(AppError::CommandFailed(format!(
             "NG response CRC mismatch: got 0x{crc:04X}, expected 0x{expected_crc:04X}"
@@ -285,14 +288,17 @@ pub async fn probe_device_capabilities(port: &str, baudrate: u32) -> Result<Prob
                 ping_resp.status, ping_resp.reason
             )));
         }
-        if ping_resp.data.len() < PING_PAYLOAD_LEN || ping_resp.data[..PING_PAYLOAD_LEN] != ping_payload[..] {
+        if ping_resp.data.len() < PING_PAYLOAD_LEN
+            || ping_resp.data[..PING_PAYLOAD_LEN] != ping_payload[..]
+        {
             return Err(AppError::CommandFailed("PING echo mismatch".into()));
         }
 
         // 4. Send CMD_CAPABILITIES (no payload).
         let caps_frame = build_ng_frame(CMD_CAPABILITIES, &[]);
-        port.write_all(&caps_frame)
-            .map_err(|e| AppError::CommandFailed(format!("Failed to write CMD_CAPABILITIES: {e}")))?;
+        port.write_all(&caps_frame).map_err(|e| {
+            AppError::CommandFailed(format!("Failed to write CMD_CAPABILITIES: {e}"))
+        })?;
 
         // 5. Read the capabilities response.
         let caps_resp = read_ng_response(&mut *port)?;
@@ -342,7 +348,7 @@ pub async fn query_bwm_battery_raw(port: &str, baudrate: u32) -> Result<Vec<u8>,
     let port = port.to_string();
     let result = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, AppError> {
         let mut sp = serialport::new(&port, baudrate)
-            .timeout(Duration::from_millis(2000))
+            .timeout(Duration::from_millis(5000))
             .open()
             .map_err(|e| {
                 AppError::CommandFailed(format!("Failed to open serial port {port}: {e}"))
@@ -387,9 +393,8 @@ pub async fn query_cep_status_raw(port: &str, baudrate: u32) -> Result<Vec<u8>, 
             })?;
 
         let frame = build_ng_frame(CMD_CEP_STATUS, &[]);
-        sp.write_all(&frame).map_err(|e| {
-            AppError::CommandFailed(format!("Failed to write CMD_CEP_STATUS: {e}"))
-        })?;
+        sp.write_all(&frame)
+            .map_err(|e| AppError::CommandFailed(format!("Failed to write CMD_CEP_STATUS: {e}")))?;
 
         let resp = read_ng_response(&mut *sp)?;
         if resp.status != 0 {
@@ -418,7 +423,7 @@ pub async fn query_fpga_status_raw(port: &str, baudrate: u32) -> Result<Vec<u8>,
     let port = port.to_string();
     let result = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, AppError> {
         let mut sp = serialport::new(&port, baudrate)
-            .timeout(Duration::from_millis(2000))
+            .timeout(Duration::from_millis(5000))
             .open()
             .map_err(|e| {
                 AppError::CommandFailed(format!("Failed to open serial port {port}: {e}"))
@@ -553,7 +558,11 @@ pub async fn query_rgb_status_raw(port: &str, baudrate: u32) -> Result<Vec<u8>, 
 /// Send an RGB LED configuration command to the PM5 device.
 /// Sends CMD_PM5_RGB_SET_COLOR (0x0180) with the given payload and verifies the response.
 /// Releases the port with a short delay to avoid Windows COM handle contention.
-pub async fn send_rgb_command_raw(port: &str, baudrate: u32, payload: &[u8]) -> Result<(), AppError> {
+pub async fn send_rgb_command_raw(
+    port: &str,
+    baudrate: u32,
+    payload: &[u8],
+) -> Result<(), AppError> {
     let lock = port_serial_lock(port);
     let _guard = lock.lock().await;
     let port = port.to_string();
@@ -630,7 +639,11 @@ pub async fn query_power_status_raw(port: &str, baudrate: u32) -> Result<Vec<u8>
 /// Send a power rail enable/disable command to the PM5 device.
 /// Sends CMD_PM5_POWER_SET_RAIL (0x0171) with the given payload and verifies the response.
 /// Releases the port with a short delay to avoid Windows COM handle contention.
-pub async fn send_power_command_raw(port: &str, baudrate: u32, payload: &[u8]) -> Result<(), AppError> {
+pub async fn send_power_command_raw(
+    port: &str,
+    baudrate: u32,
+    payload: &[u8],
+) -> Result<(), AppError> {
     let lock = port_serial_lock(port);
     let _guard = lock.lock().await;
     let port = port.to_string();
@@ -782,4 +795,3 @@ mod tests {
         assert!(!Arc::ptr_eq(&a1, &b));
     }
 }
-

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { TerminalPanel } from '../shared/TerminalPanel';
 import { useSfx } from '../../hooks/useSfx';
+import { invoke } from '@tauri-apps/api/core';
 import type { CardData, CardType, Frequency } from '../../machines/types';
 
 interface ScanStepProps {
@@ -16,6 +17,11 @@ interface ScanStepProps {
   cloneable?: boolean;
   /** When true, WRITE button skips swap card dialog (HF cards need source on reader for autopwn) */
   skipSwapConfirm?: boolean;
+  isEmulating?: boolean;
+  onEmulate?: () => void;
+  onStopEmulation?: () => void;
+  onReadCrack?: () => void;
+  onRetryRead?: (key: string) => void;
 }
 
 const SPINNER_FRAMES = ['|', '/', '-', '\\'];
@@ -32,6 +38,11 @@ export function ScanStep({
   frequency,
   cloneable,
   skipSwapConfirm,
+  isEmulating,
+  onEmulate,
+  onStopEmulation,
+  onReadCrack,
+  onRetryRead,
 }: ScanStepProps) {
   const sfx = useSfx();
   const [spinnerIdx, setSpinnerIdx] = useState(0);
@@ -42,6 +53,8 @@ export function ScanStep({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [savedDisplayName, setSavedDisplayName] = useState('');
   const [showWriteConfirm, setShowWriteConfirm] = useState(false);
+  const [masterKey, setMasterKey] = useState('');
+  const [t55Password, setT55Password] = useState('');
 
   // Border pulse animation when idle (not scanning, no result)
   useEffect(() => {
@@ -60,6 +73,24 @@ export function ScanStep({
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
   }, [isLoading]);
+
+  if (isEmulating) {
+    return (
+      <TerminalPanel title="EMULATING">
+        <div style={{ color: 'var(--green-bright)', fontSize: '14px', fontWeight: 700 }}>
+          Emulating tag — present Proxmark5 to reader
+        </div>
+        <div style={{ marginTop: '16px' }}>
+          <button
+            onClick={() => { sfx.action(); onStopEmulation?.(); }}
+            style={{ background: 'var(--bg-void)', fontFamily: 'var(--font-mono)', fontSize: '13px', fontWeight: 600, padding: '6px 20px', cursor: 'pointer', color: 'var(--red-bright, #f33)', border: '2px solid var(--red-bright, #f33)' }}
+          >
+            [STOP]
+          </button>
+        </div>
+      </TerminalPanel>
+    );
+  }
 
   // Card has been identified -- show results
   if (cardData && cardType) {
@@ -125,6 +156,74 @@ export function ScanStep({
             </div>
           )}
 
+          {/* KeyRequired inline retry */}
+          {cardData.read_error === 'KeyRequired' && (
+            <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: 'var(--green-dim)' }}>Custom Master Key:</span>
+              <input
+                value={masterKey}
+                onChange={(e) => setMasterKey(e.target.value)}
+                style={{ background: 'var(--bg-void)', color: 'var(--green-bright)', border: '1px solid var(--green-dim)', fontFamily: 'var(--font-mono)', fontSize: '13px', padding: '4px 8px', flex: 1, maxWidth: '240px', outline: 'none' }}
+                placeholder="key hex..."
+              />
+              <button onClick={() => { sfx.action(); onRetryRead?.(masterKey); }} style={{ ...btnBase, color: 'var(--green-bright)', border: '1px solid var(--green-bright)', padding: '4px 12px' }}>
+                [Retry Read]
+              </button>
+            </div>
+          )}
+
+          {/* Password-protected T5577 */}
+          {cardData.read_error === 'PasswordProtected' && (
+            <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: 'var(--green-dim)' }}>T5577 Password (hex):</span>
+              <input
+                value={t55Password}
+                onChange={(e) => setT55Password(e.target.value)}
+                style={{ background: 'var(--bg-void)', color: 'var(--green-bright)', border: '1px solid var(--green-dim)', fontFamily: 'var(--font-mono)', fontSize: '13px', padding: '4px 8px', flex: 1, maxWidth: '240px', outline: 'none' }}
+                placeholder="password hex..."
+              />
+              <button onClick={() => { sfx.action(); }} style={{ ...btnBase, color: 'var(--green-bright)', border: '1px solid var(--green-bright)', padding: '4px 12px' }}>
+                [Unlock & Read]
+              </button>
+            </div>
+          )}
+
+          {/* Read-only reason banner */}
+          {cardData.non_cloneable_reason && (
+            <div style={{ marginTop: '12px', color: 'var(--amber)', fontWeight: 600 }}>
+              [!!] {cardData.non_cloneable_reason}
+            </div>
+          )}
+
+          {/* KeyRequired inline retry */}
+          {cardData.read_error === 'KeyRequired' && (
+            <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ color: 'var(--green-dim)' }}>Custom Master Key:</span>
+              <input
+                value={masterKey}
+                onChange={(e) => setMasterKey(e.target.value)}
+                style={{
+                  background: 'var(--bg-void)',
+                  color: 'var(--green-bright)',
+                  border: '1px solid var(--green-dim)',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '13px',
+                  padding: '4px 8px',
+                  flex: 1,
+                  maxWidth: '240px',
+                  outline: 'none',
+                }}
+                placeholder="key hex..."
+              />
+              <button
+                onClick={() => { sfx.action(); onRetryRead?.(masterKey); }}
+                style={{ ...btnBase, color: 'var(--green-bright)', border: '1px solid var(--green-bright)', padding: '4px 12px' }}
+              >
+                [Retry Read]
+              </button>
+            </div>
+          )}
+
           {/* Action buttons */}
           <div style={{ marginTop: '16px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             {/* BACK button */}
@@ -152,56 +251,120 @@ export function ScanStep({
               </button>
             )}
 
-            {/* SAVE button */}
-            {onSave && (
-              <button
-                onClick={() => {
-                  sfx.action();
-                  setShowSaveInput(true);
-                  setSaveStatus('idle');
-                }}
-                disabled={showSaveInput}
-                style={{
-                  ...btnBase,
-                  color: 'var(--amber)',
-                  border: '2px solid var(--amber)',
-                  opacity: showSaveInput ? 0.5 : 1,
-                  cursor: showSaveInput ? 'default' : 'pointer',
-                }}
-                onMouseEnter={(e) => {
-                  if (!showSaveInput) {
-                    sfx.hover();
-                    e.currentTarget.style.background = 'rgba(255, 184, 0, 0.08)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'var(--bg-void)';
-                }}
-              >
-                [SAVE]
-              </button>
-            )}
-
-            {/* WRITE button (only for cloneable) */}
-            {cloneable !== false && (
-              <button
-                onClick={() => { sfx.action(); skipSwapConfirm ? onScanned() : setShowWriteConfirm(true); }}
-                style={{
-                  ...btnBase,
-                  color: 'var(--green-bright)',
-                  border: '2px solid var(--green-bright)',
-                }}
-                onMouseEnter={(e) => {
-                  sfx.hover();
-                  e.currentTarget.style.background = 'var(--green-ghost)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'var(--bg-void)';
-                }}
-              >
-                {'-->'} WRITE
-              </button>
-            )}
+            {(() => {
+              const hasDump = !!cardData.dump_file;
+              const canRead = cardData.can_read !== false;
+              const isReadOnly = cardData.can_write === false;
+              const isBlankT55 = cardType === 'T55xx' && !hasDump;
+              if (isBlankT55) {
+                return (
+                  <>
+                    <button onClick={() => { sfx.action(); skipSwapConfirm ? onScanned() : setShowWriteConfirm(true); }} style={{ ...btnBase, color: 'var(--green-bright)', border: '2px solid var(--green-bright)' }}>
+                      {'-->'} WRITE
+                    </button>
+                    <button disabled title="Blank chip contains no payload to emulate or read." style={{ ...btnBase, color: 'var(--green-dim)', border: '2px solid var(--green-dim)', opacity: 0.4, cursor: 'default' }}>[EMULATE]</button>
+                    <button disabled title="Blank chip contains no payload to emulate or read." style={{ ...btnBase, color: 'var(--green-dim)', border: '2px solid var(--green-dim)', opacity: 0.4, cursor: 'default' }}>[VERIFY]</button>
+                    <button disabled title="Blank chip contains no payload to emulate or read." style={{ ...btnBase, color: 'var(--green-dim)', border: '2px solid var(--green-dim)', opacity: 0.4, cursor: 'default' }}>[READ / CRACK CARD]</button>
+                  </>
+                );
+              }
+              if (!hasDump && canRead && !isReadOnly) {
+                return (
+                  <button
+                    onClick={() => {
+                      sfx.action();
+                      const memoryTypes = ['T55xx', 'EM4305', 'Hitag2', 'PaxtonNet2', 'PaxtonSwitch2'];
+                      if (cardType && memoryTypes.includes(cardType) && cardData) {
+                        invoke<string>('read_lf_memory_card', { cardType, cardData, port: device.port })
+                          .then(() => {})
+                          .catch(() => {});
+                      } else {
+                        onReadCrack?.();
+                      }
+                    }}
+                    style={{
+                      ...btnBase,
+                      color: 'var(--green-bright)',
+                      border: '2px solid var(--green-bright)',
+                    }}
+                    onMouseEnter={(e) => { sfx.hover(); e.currentTarget.style.background = 'var(--green-ghost)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-void)'; }}
+                  >
+                    [READ / CRACK CARD]
+                  </button>
+                );
+              }
+              return (
+                <>
+                  {/* SAVE button */}
+                  {onSave && (
+                    <button
+                      onClick={() => {
+                        sfx.action();
+                        setShowSaveInput(true);
+                        setSaveStatus('idle');
+                      }}
+                      disabled={showSaveInput}
+                      style={{
+                        ...btnBase,
+                        color: 'var(--amber)',
+                        border: '2px solid var(--amber)',
+                        opacity: showSaveInput ? 0.5 : 1,
+                        cursor: showSaveInput ? 'default' : 'pointer',
+                      }}
+                    >
+                      [SAVE]
+                    </button>
+                  )}
+                  {/* EMULATE button */}
+                  <button
+                    onClick={() => { sfx.action(); onEmulate?.(); }}
+                    disabled={!cardData.can_emulate}
+                    title={!cardData.can_emulate ? (cardData.non_cloneable_reason || 'Requires card dump — click Read/Crack first.') : undefined}
+                    style={{
+                      ...btnBase,
+                      color: 'var(--green-bright)',
+                      border: '2px solid var(--green-bright)',
+                      opacity: cardData.can_emulate ? 1 : 0.4,
+                      cursor: cardData.can_emulate ? 'pointer' : 'default',
+                    }}
+                  >
+                    [EMULATE]
+                  </button>
+                  {/* WRITE button */}
+                  {cloneable !== false && (
+                    <button
+                      onClick={() => { sfx.action(); skipSwapConfirm ? onScanned() : setShowWriteConfirm(true); }}
+                      disabled={!hasDump || isReadOnly}
+                      title={!hasDump || isReadOnly ? (cardData.non_cloneable_reason || 'Requires card dump — click Read/Crack first.') : undefined}
+                      style={{
+                        ...btnBase,
+                        color: 'var(--green-bright)',
+                        border: '2px solid var(--green-bright)',
+                        opacity: hasDump ? 1 : 0.4,
+                        cursor: hasDump ? 'pointer' : 'default',
+                      }}
+                    >
+                      {'-->'} WRITE
+                    </button>
+                  )}
+                  {/* VERIFY button */}
+                  <button
+                    onClick={() => { sfx.action(); }}
+                    disabled={!hasDump}
+                    style={{
+                      ...btnBase,
+                      color: 'var(--green-dim)',
+                      border: '2px solid var(--green-dim)',
+                      opacity: hasDump ? 1 : 0.4,
+                      cursor: hasDump ? 'pointer' : 'default',
+                    }}
+                  >
+                    [VERIFY]
+                  </button>
+                </>
+              );
+            })()}
           </div>
 
           {/* Inline save name input */}

@@ -590,9 +590,22 @@ export const wizardMachine = setup({
         START_HF_PROCESS: {
           target: 'hfProcessing',
         },
+        EMULATE: {
+          target: 'emulating',
+        },
         BACK_TO_SCAN: {
           target: 'deviceConnected',
           actions: assign(() => clearCardFields),
+        },
+        DISCONNECT: { target: 'idle', actions: assign(() => initialContext) },
+        RESET: { target: 'idle', actions: assign(() => initialContext) },
+      },
+    },
+
+    emulating: {
+      on: {
+        STOP_EMULATION: {
+          target: 'cardIdentified',
         },
         DISCONNECT: { target: 'idle', actions: assign(() => initialContext) },
         RESET: { target: 'idle', actions: assign(() => initialContext) },
@@ -613,6 +626,17 @@ export const wizardMachine = setup({
                 if (ws.step === 'HfDumpReady') return ws.data.dump_info;
                 return null;
               },
+            }),
+          },
+          {
+            guard: ({ event }) => {
+              const ws = event.output;
+              return ws.step === 'Error' && /KeyRequired/i.test(ws.data?.message ?? '');
+            },
+            target: 'cardIdentified',
+            actions: assign({
+              cardData: ({ context }) =>
+                context.cardData ? { ...context.cardData, read_error: 'KeyRequired' } : context.cardData,
             }),
           },
           {
@@ -665,6 +689,14 @@ export const wizardMachine = setup({
 
     hfDumpReady: {
       on: {
+        VIEW_CARD_DETAILS: {
+          target: 'cardIdentified',
+          actions: assign({
+            cardData: ({ context, event }) => context.cardData
+              ? { ...context.cardData, dump_file: event.dumpPath ?? context.cardData.dump_file }
+              : context.cardData,
+          }),
+        },
         SKIP_TO_BLANK: {
           target: 'waitingForBlank',
           actions: assign({

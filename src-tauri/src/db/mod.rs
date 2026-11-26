@@ -12,9 +12,8 @@ pub struct Database {
 
 impl Database {
     pub fn open(app_data_dir: PathBuf) -> Result<Self, AppError> {
-        std::fs::create_dir_all(&app_data_dir).map_err(|e| {
-            AppError::DatabaseError(format!("Cannot create data dir: {}", e))
-        })?;
+        std::fs::create_dir_all(&app_data_dir)
+            .map_err(|e| AppError::DatabaseError(format!("Cannot create data dir: {}", e)))?;
 
         let db_path = app_data_dir.join("phosphor.db");
         let conn = Connection::open(&db_path)?;

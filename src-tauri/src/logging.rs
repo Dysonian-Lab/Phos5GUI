@@ -127,9 +127,7 @@ fn find_client_binary() -> Option<PathBuf> {
         }
     }
     candidates.push(PathBuf::from("proxmark3.exe"));
-    candidates
-        .into_iter()
-        .find(|p| p.is_file() || p.exists())
+    candidates.into_iter().find(|p| p.is_file() || p.exists())
 }
 
 /// Create the session log and write the environment header.
@@ -230,7 +228,11 @@ fn write_raw(text: &str) {
 
 /// Write a timestamped line.
 pub fn line(text: &str) {
-    log(&format!("[{}] {}\n", chrono::Local::now().format("%H:%M:%S%.3f"), text));
+    log(&format!(
+        "[{}] {}\n",
+        chrono::Local::now().format("%H:%M:%S%.3f"),
+        text
+    ));
 }
 
 /// Write a visual section separator, e.g. a wizard step or scan attempt.
@@ -330,7 +332,9 @@ pub fn command(
     raw: &str,
     note: Option<&str>,
 ) {
-    log(&render_command_block(port, cmd, elapsed_ms, exit_code, raw, note));
+    log(&render_command_block(
+        port, cmd, elapsed_ms, exit_code, raw, note,
+    ));
 }
 
 /// Absolute path of the current session log, for display in the UI.
@@ -379,7 +383,10 @@ mod tests {
         assert!(body.contains("PHOSPHOR SESSION LOG"), "header missing");
         assert!(body.contains(env!("CARGO_PKG_VERSION")), "version missing");
         assert!(body.contains("hello from test"), "line() missing");
-        assert!(body.contains(">>> COMMAND : lf t55xx detect"), "cmd missing");
+        assert!(
+            body.contains(">>> COMMAND : lf t55xx detect"),
+            "cmd missing"
+        );
         assert!(body.contains("T55x7"), "raw output missing");
         assert!(body.contains("EXIT CODE  : 0"), "exit code missing");
         assert!(body.contains("ELAPSED    : 12 ms"), "elapsed missing");

@@ -34,9 +34,10 @@ pub struct SavedCard {
 
 impl Database {
     pub fn insert_record(&self, record: &CloneRecord) -> Result<i64, AppError> {
-        let conn = self.conn.lock().map_err(|e| {
-            AppError::DatabaseError(format!("Lock poisoned: {}", e))
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| AppError::DatabaseError(format!("Lock poisoned: {}", e)))?;
         conn.execute(
             "INSERT INTO clone_log (source_type, source_uid, target_type, target_uid, port, success, timestamp, notes)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
@@ -55,9 +56,10 @@ impl Database {
     }
 
     pub fn get_history(&self, limit: u32) -> Result<Vec<CloneRecord>, AppError> {
-        let conn = self.conn.lock().map_err(|e| {
-            AppError::DatabaseError(format!("Lock poisoned: {}", e))
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| AppError::DatabaseError(format!("Lock poisoned: {}", e)))?;
         let mut stmt = conn.prepare(
             "SELECT id, source_type, source_uid, target_type, target_uid, port, success, timestamp, notes
              FROM clone_log ORDER BY id DESC LIMIT ?1",
@@ -84,9 +86,10 @@ impl Database {
     }
 
     pub fn insert_saved_card(&self, card: &SavedCard) -> Result<i64, AppError> {
-        let conn = self.conn.lock().map_err(|e| {
-            AppError::DatabaseError(format!("Lock poisoned: {}", e))
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| AppError::DatabaseError(format!("Lock poisoned: {}", e)))?;
         conn.execute(
             "INSERT INTO saved_cards (name, card_type, frequency, uid, raw, decoded, cloneable, recommended_blank, created_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
@@ -106,9 +109,10 @@ impl Database {
     }
 
     pub fn get_saved_cards(&self) -> Result<Vec<SavedCard>, AppError> {
-        let conn = self.conn.lock().map_err(|e| {
-            AppError::DatabaseError(format!("Lock poisoned: {}", e))
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| AppError::DatabaseError(format!("Lock poisoned: {}", e)))?;
         let mut stmt = conn.prepare(
             "SELECT id, name, card_type, frequency, uid, raw, decoded, cloneable, recommended_blank, created_at
              FROM saved_cards ORDER BY created_at DESC",
@@ -136,9 +140,10 @@ impl Database {
     }
 
     pub fn delete_saved_card(&self, id: i64) -> Result<(), AppError> {
-        let conn = self.conn.lock().map_err(|e| {
-            AppError::DatabaseError(format!("Lock poisoned: {}", e))
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| AppError::DatabaseError(format!("Lock poisoned: {}", e)))?;
         conn.execute("DELETE FROM saved_cards WHERE id = ?1", params![id])?;
         Ok(())
     }

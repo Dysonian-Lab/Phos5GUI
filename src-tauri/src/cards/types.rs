@@ -36,7 +36,26 @@ pub enum CardType {
     // LF non-cloneable types (3)
     COTAG,
     EM4x50,
+    EM4305,
     Hitag,
+    /// Hitag2 (distinct from generic Hitag). Supports Paxton Net2/Switch2 probes.
+    Hitag2,
+    /// Paxton Net2 (Hitag2-derived).
+    PaxtonNet2,
+    /// Paxton Switch2 (Hitag2-derived).
+    PaxtonSwitch2,
+    /// Topaz / Jewel (NFC).
+    Topaz,
+    /// ISO 14443-B.
+    ISO14443B,
+    /// ISO 15693 ICODE.
+    ISO15693ICODE,
+    /// ISO 15693 ST.
+    ISO15693ST,
+    /// LEGIC.
+    Legic,
+    /// FeliCa.
+    Felica,
     /// Generic T55xx chipset (T5577/T5555) reported by `lf search` as
     /// "[+] Chipset... T55xx". Not a cloneable type -- these are config chips,
     /// handled by the T55xx Advanced tab rather than the clone wizard.
@@ -48,6 +67,19 @@ pub enum CardType {
     NTAG,
     DESFire,
     IClass,
+    // MIFARE Classic variants (Phase 2 subtype resolution)
+    MifareClassicMini,
+    MifareClassicPlus2K,
+    MifareClassicPossible,
+    // Ultralight / NTAG variants
+    MifareUltralightC,
+    MifareUltralightEV1,
+    NTAG213,
+    NTAG215,
+    NTAG216,
+    // iCLASS variants
+    IClassElite,
+    IClassSE,
 }
 
 impl CardType {
@@ -77,7 +109,17 @@ impl CardType {
             | CardType::IDTECK
             | CardType::COTAG
             | CardType::EM4x50
+            | CardType::EM4305
             | CardType::Hitag
+            | CardType::Hitag2
+            | CardType::PaxtonNet2
+            | CardType::PaxtonSwitch2
+            | CardType::Topaz
+            | CardType::ISO14443B
+            | CardType::ISO15693ICODE
+            | CardType::ISO15693ST
+            | CardType::Legic
+            | CardType::Felica
             | CardType::T55xx => Frequency::LF,
 
             CardType::MifareClassic1K
@@ -85,7 +127,17 @@ impl CardType {
             | CardType::MifareUltralight
             | CardType::NTAG
             | CardType::DESFire
-            | CardType::IClass => Frequency::HF,
+            | CardType::IClass
+            | CardType::MifareClassicMini
+            | CardType::MifareClassicPlus2K
+            | CardType::MifareClassicPossible
+            | CardType::MifareUltralightC
+            | CardType::MifareUltralightEV1
+            | CardType::NTAG213
+            | CardType::NTAG215
+            | CardType::NTAG216
+            | CardType::IClassElite
+            | CardType::IClassSE => Frequency::HF,
         }
     }
 
@@ -117,7 +169,17 @@ impl CardType {
             CardType::IDTECK => "IDTECK",
             CardType::COTAG => "COTAG",
             CardType::EM4x50 => "EM4x50",
+            CardType::EM4305 => "EM4305",
             CardType::Hitag => "Hitag",
+            CardType::Hitag2 => "Hitag2",
+            CardType::PaxtonNet2 => "Paxton Net2",
+            CardType::PaxtonSwitch2 => "Paxton Switch2",
+            CardType::Topaz => "Topaz",
+            CardType::ISO14443B => "ISO 14443-B",
+            CardType::ISO15693ICODE => "ISO 15693 ICODE",
+            CardType::ISO15693ST => "ISO 15693 ST",
+            CardType::Legic => "LEGIC",
+            CardType::Felica => "FeliCa",
             CardType::T55xx => "T55xx",
             CardType::MifareClassic1K => "MIFARE Classic 1K",
             CardType::MifareClassic4K => "MIFARE Classic 4K",
@@ -125,6 +187,16 @@ impl CardType {
             CardType::NTAG => "NTAG",
             CardType::DESFire => "DESFire",
             CardType::IClass => "iCLASS",
+            CardType::MifareClassicMini => "MIFARE Classic Mini",
+            CardType::MifareClassicPlus2K => "MIFARE Classic Plus 2K",
+            CardType::MifareClassicPossible => "MIFARE Classic Possible",
+            CardType::MifareUltralightC => "MIFARE Ultralight C",
+            CardType::MifareUltralightEV1 => "MIFARE Ultralight EV1",
+            CardType::NTAG213 => "NTAG 213",
+            CardType::NTAG215 => "NTAG 215",
+            CardType::NTAG216 => "NTAG 216",
+            CardType::IClassElite => "iCLASS Elite",
+            CardType::IClassSE => "iCLASS SE",
         }
     }
 
@@ -204,14 +276,20 @@ impl CardType {
             | CardType::Motorola
             | CardType::IDTECK => BlankType::T5577,
             // Non-cloneable LF: return T5577 as placeholder (won't actually be used)
-            CardType::COTAG | CardType::EM4x50 | CardType::Hitag => BlankType::T5577,
+            CardType::COTAG | CardType::EM4x50 | CardType::EM4305 | CardType::Hitag | CardType::Hitag2
+            | CardType::PaxtonNet2 | CardType::PaxtonSwitch2 | CardType::Topaz
+            | CardType::ISO14443B | CardType::ISO15693ICODE | CardType::ISO15693ST
+            | CardType::Legic | CardType::Felica => BlankType::T5577,
             CardType::T55xx => BlankType::T5577,
             // HF types
-            CardType::MifareClassic1K | CardType::MifareClassic4K => BlankType::MagicMifareGen1a,
-            CardType::MifareUltralight => BlankType::MagicUltralight,
-            CardType::NTAG => BlankType::MagicUltralight,
+            CardType::MifareClassic1K | CardType::MifareClassic4K
+            | CardType::MifareClassicMini | CardType::MifareClassicPlus2K
+            | CardType::MifareClassicPossible => BlankType::MagicMifareGen1a,
+            CardType::MifareUltralight | CardType::MifareUltralightC
+            | CardType::MifareUltralightEV1 | CardType::NTAG | CardType::NTAG213
+            | CardType::NTAG215 | CardType::NTAG216 => BlankType::MagicUltralight,
             CardType::DESFire => BlankType::MagicMifareGen4GTU,
-            CardType::IClass => BlankType::IClassBlank,
+            CardType::IClass | CardType::IClassElite | CardType::IClassSE => BlankType::IClassBlank,
         }
     }
 }
@@ -249,6 +327,21 @@ impl BlankType {
 
 /// T5577 chip detection result from `lf t55xx detect`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CardCapabilities {
+    pub can_read: bool,
+    pub can_write: bool,
+    pub can_emulate: bool,
+    pub recommended_blank: BlankType,
+    pub read_commands: Vec<String>,
+    pub write_commands: Vec<String>,
+    pub verify_commands: Vec<String>,
+    pub sim_commands: Vec<String>,
+    pub read_reason: Option<String>,
+    pub write_reason: Option<String>,
+    pub emulate_reason: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct T5577Status {
     pub detected: bool,
     pub chip_type: String,
@@ -257,11 +350,36 @@ pub struct T5577Status {
     pub modulation: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
 pub struct CardData {
     pub uid: String,
     pub raw: String,
     pub decoded: HashMap<String, String>,
+    // Phase 0 scan-result extensions (all optional/defaulted for backward compat)
+    #[serde(default)]
+    pub found: bool,
+    #[serde(rename = "type", default)]
+    pub card_type: Option<CardType>,
+    #[serde(default)]
+    pub subtype: Option<String>,
+    #[serde(default)]
+    pub data: Option<String>,
+    #[serde(default)]
+    pub can_read: bool,
+    #[serde(default)]
+    pub can_write: bool,
+    #[serde(default)]
+    pub can_emulate: bool,
+    #[serde(default)]
+    pub recommended_blank: Option<BlankType>,
+    #[serde(default)]
+    pub dump_file: Option<String>,
+    #[serde(default)]
+    pub keys_found: u32,
+    #[serde(default)]
+    pub read_error: Option<String>,
+    #[serde(default)]
+    pub non_cloneable_reason: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

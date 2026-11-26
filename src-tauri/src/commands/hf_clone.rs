@@ -31,9 +31,9 @@ pub async fn hf_autopwn(
 ) -> Result<WizardState, AppError> {
     // Extract port + card_type from current state, then transition to HfProcessing
     let (port, card_type) = {
-        let mut m = machine.lock().map_err(|e| {
-            AppError::CommandFailed(format!("State lock poisoned: {}", e))
-        })?;
+        let mut m = machine
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
         let (port, card_type) = match &m.current {
             WizardState::CardIdentified { card_type, .. } => {
                 match card_type {
@@ -92,67 +92,60 @@ pub async fn hf_autopwn(
     );
 
     // Run streaming command with per-line autopwn parsing (1h timeout for hardnested)
-    let result = connection::run_command_streaming(
-        &app,
-        &port,
-        &cmd,
-        3600,
-        &hf_state,
-        |line| {
-            if let Some(event) = output_parser::parse_autopwn_line(line) {
-                let elapsed = start_time.elapsed().as_secs() as u32;
+    let result = connection::run_command_streaming(&app, &port, &cmd, 3600, &hf_state, |line| {
+        if let Some(event) = output_parser::parse_autopwn_line(line) {
+            let elapsed = start_time.elapsed().as_secs() as u32;
 
-                match &event {
-                    AutopwnEvent::DictionaryProgress { found, total } => {
-                        current_phase = ProcessPhase::KeyCheck;
-                        keys_found = *found;
-                        keys_total = *total;
-                    }
-                    AutopwnEvent::KeyFound { .. } => {
-                        keys_found += 1;
-                    }
-                    AutopwnEvent::DarksideStarted => {
-                        current_phase = ProcessPhase::Darkside;
-                    }
-                    AutopwnEvent::NestedStarted => {
-                        current_phase = ProcessPhase::Nested;
-                    }
-                    AutopwnEvent::HardnestedStarted => {
-                        current_phase = ProcessPhase::Hardnested;
-                    }
-                    AutopwnEvent::StaticnestedStarted => {
-                        current_phase = ProcessPhase::StaticNested;
-                    }
-                    AutopwnEvent::DumpComplete { file_path } => {
-                        dump_complete = true;
-                        if !file_path.is_empty() {
-                            dump_file = Some(file_path.clone());
-                        }
-                        current_phase = ProcessPhase::Dumping;
-                    }
-                    AutopwnEvent::DumpPartial { file_path } => {
-                        dump_partial = true;
-                        if !file_path.is_empty() {
-                            dump_file = Some(file_path.clone());
-                        }
-                        current_phase = ProcessPhase::Dumping;
-                    }
-                    AutopwnEvent::Failed { .. } | AutopwnEvent::Finished { .. } => {}
+            match &event {
+                AutopwnEvent::DictionaryProgress { found, total } => {
+                    current_phase = ProcessPhase::KeyCheck;
+                    keys_found = *found;
+                    keys_total = *total;
                 }
-
-                // Emit progress event to frontend
-                let _ = app_for_closure.emit(
-                    "hf-progress",
-                    HfProgressPayload {
-                        phase: format!("{:?}", current_phase),
-                        keys_found,
-                        keys_total,
-                        elapsed_secs: elapsed,
-                    },
-                );
+                AutopwnEvent::KeyFound { .. } => {
+                    keys_found += 1;
+                }
+                AutopwnEvent::DarksideStarted => {
+                    current_phase = ProcessPhase::Darkside;
+                }
+                AutopwnEvent::NestedStarted => {
+                    current_phase = ProcessPhase::Nested;
+                }
+                AutopwnEvent::HardnestedStarted => {
+                    current_phase = ProcessPhase::Hardnested;
+                }
+                AutopwnEvent::StaticnestedStarted => {
+                    current_phase = ProcessPhase::StaticNested;
+                }
+                AutopwnEvent::DumpComplete { file_path } => {
+                    dump_complete = true;
+                    if !file_path.is_empty() {
+                        dump_file = Some(file_path.clone());
+                    }
+                    current_phase = ProcessPhase::Dumping;
+                }
+                AutopwnEvent::DumpPartial { file_path } => {
+                    dump_partial = true;
+                    if !file_path.is_empty() {
+                        dump_file = Some(file_path.clone());
+                    }
+                    current_phase = ProcessPhase::Dumping;
+                }
+                AutopwnEvent::Failed { .. } | AutopwnEvent::Finished { .. } => {}
             }
-        },
-    )
+
+            // Emit progress event to frontend
+            let _ = app_for_closure.emit(
+                "hf-progress",
+                HfProgressPayload {
+                    phase: format!("{:?}", current_phase),
+                    keys_found,
+                    keys_total,
+                    elapsed_secs: elapsed,
+                },
+            );
+        }
+    })
     .await;
 
     match result {
@@ -181,16 +174,16 @@ pub async fn hf_autopwn(
             };
 
             // Transition to HfDumpReady
-            let mut m = machine.lock().map_err(|e| {
-                AppError::CommandFailed(format!("State lock poisoned: {}", e))
-            })?;
+            let mut m = machine
+                .lock()
+                .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
             m.transition(WizardAction::HfProcessComplete { dump_info })?;
             Ok(m.current.clone())
         }
         Err(e) => {
-            let mut m = machine.lock().map_err(|e| {
-                AppError::CommandFailed(format!("State lock poisoned: {}", e))
-            })?;
+            let mut m = machine
+                .lock()
+                .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
             m.transition(WizardAction::ReportError {
                 message: e.to_string(),
                 user_message: "Key recovery failed. Check device connection and try again."
@@ -203,15 +196,34 @@ pub async fn hf_autopwn(
     }
 }
 
-/// Cancel a running HF operation (autopwn, dump, write) by killing the child process.
+/// Automated iCLASS key trial sequence.
+pub async fn iclass_automated_read(
+    app: &AppHandle,
+    port: &str,
+) -> Result<String, AppError> {
+    // Attempt 1
+    if connection::run_command(app, port, "hf iclass dump --ki 0").await.is_ok() {
+        return Ok("dump.bin".to_string());
+    }
+    // Attempt 2
+    if connection::run_command(app, port, "hf iclass dump -k AEA684A6DAB23278").await.is_ok() {
+        return Ok("dump.bin".to_string());
+    }
+    // Attempt 3
+    if connection::run_command(app, port, "hf iclass dump -k 2020666666668888").await.is_ok() {
+        return Ok("dump.bin".to_string());
+    }
+    Err(AppError::CommandFailed("KeyRequired".to_string()))
+}
 #[tauri::command]
 pub async fn cancel_hf_operation(
     hf_state: tauri::State<'_, HfOperationState>,
 ) -> Result<(), AppError> {
     let child = {
-        let mut lock = hf_state.child.lock().map_err(|e| {
-            AppError::CommandFailed(format!("HF state lock poisoned: {}", e))
-        })?;
+        let mut lock = hf_state
+            .child
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("HF state lock poisoned: {}", e)))?;
         lock.take()
     };
 
@@ -249,9 +261,9 @@ pub async fn hf_write_clone(
 ) -> Result<WizardState, AppError> {
     // Extract port from machine, validate state
     let port = {
-        let mut m = machine.lock().map_err(|e| {
-            AppError::CommandFailed(format!("State lock poisoned: {}", e))
-        })?;
+        let mut m = machine
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
         match &m.current {
             WizardState::BlankDetected { .. } => {}
             _ => {
@@ -260,18 +272,20 @@ pub async fn hf_write_clone(
                 ));
             }
         }
-        let port = m.port.clone().ok_or_else(|| {
-            AppError::InvalidTransition("No port in machine state".to_string())
-        })?;
+        let port = m
+            .port
+            .clone()
+            .ok_or_else(|| AppError::InvalidTransition("No port in machine state".to_string()))?;
         m.transition(WizardAction::StartWrite)?;
         port
     };
 
     // Get dump file path from HfOperationState (set by hf_autopwn or hf_dump)
     let dump_path = {
-        let lock = hf_state.dump_path.lock().map_err(|e| {
-            AppError::CommandFailed(format!("HF state lock poisoned: {}", e))
-        })?;
+        let lock = hf_state
+            .dump_path
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("HF state lock poisoned: {}", e)))?;
         lock.clone().ok_or_else(|| {
             AppError::CommandFailed("No dump file available. Run key recovery first.".to_string())
         })?
@@ -279,46 +293,32 @@ pub async fn hf_write_clone(
 
     // Run the write workflow, catching errors to report via FSM
     let result = match blank_type {
-        BlankType::MagicMifareGen1a => {
-            write_gen1a(&app, &port, &dump_path, &machine).await
-        }
+        BlankType::MagicMifareGen1a => write_gen1a(&app, &port, &dump_path, &machine).await,
         BlankType::MagicMifareGen2 => {
             write_gen2(&app, &port, &dump_path, &source_uid, &card_type, &machine).await
         }
         BlankType::MagicMifareGen3 => {
             write_gen3(&app, &port, &dump_path, &source_uid, &card_type, &machine).await
         }
-        BlankType::MagicMifareGen4GTU => {
-            write_gen4_gtu(&app, &port, &dump_path, &machine).await
-        }
-        BlankType::MagicMifareGen4GDM => {
-            write_gen4_gdm(&app, &port, &dump_path, &machine).await
-        }
-        BlankType::MagicUltralight => {
-            write_ultralight(&app, &port, &dump_path, &machine).await
-        }
-        BlankType::IClassBlank => {
-            write_iclass(&app, &port, &dump_path, &machine).await
-        }
-        _ => {
-            Err(AppError::CommandFailed(format!(
-                "Unsupported HF blank type: {:?}",
-                blank_type
-            )))
-        }
+        BlankType::MagicMifareGen4GTU => write_gen4_gtu(&app, &port, &dump_path, &machine).await,
+        BlankType::MagicMifareGen4GDM => write_gen4_gdm(&app, &port, &dump_path, &machine).await,
+        BlankType::MagicUltralight => write_ultralight(&app, &port, &dump_path, &machine).await,
+        BlankType::IClassBlank => write_iclass(&app, &port, &dump_path, &machine).await,
+        _ => Err(AppError::CommandFailed(format!(
+            "Unsupported HF blank type: {:?}",
+            blank_type
+        ))),
     };
 
     match result {
         Ok(state) => Ok(state),
-        Err(e) => {
-            report_error(
-                &machine,
-                &e.to_string(),
-                "Write failed. Do not remove the card — try again.",
-                true,
-                Some(RecoveryAction::Retry),
-            )
-        }
+        Err(e) => report_error(
+            &machine,
+            &e.to_string(),
+            "Write failed. Do not remove the card — try again.",
+            true,
+            Some(RecoveryAction::Retry),
+        ),
     }
 }
 
@@ -339,9 +339,9 @@ pub async fn hf_dump(
 ) -> Result<WizardState, AppError> {
     // Extract port + card_type, transition to HfProcessing
     let (port, card_type) = {
-        let mut m = machine.lock().map_err(|e| {
-            AppError::CommandFailed(format!("State lock poisoned: {}", e))
-        })?;
+        let mut m = machine
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
         let (port, card_type) = match &m.current {
             WizardState::CardIdentified { card_type, .. } => {
                 match card_type {
@@ -394,16 +394,16 @@ pub async fn hf_dump(
                 _ => "Ultralight dump complete.".to_string(),
             };
 
-            let mut m = machine.lock().map_err(|e| {
-                AppError::CommandFailed(format!("State lock poisoned: {}", e))
-            })?;
+            let mut m = machine
+                .lock()
+                .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
             m.transition(WizardAction::HfProcessComplete { dump_info })?;
             Ok(m.current.clone())
         }
         Err(e) => {
-            let mut m = machine.lock().map_err(|e| {
-                AppError::CommandFailed(format!("State lock poisoned: {}", e))
-            })?;
+            let mut m = machine
+                .lock()
+                .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
             m.transition(WizardAction::ReportError {
                 message: e.to_string(),
                 user_message: "Dump failed. Check device connection and try again.".to_string(),
@@ -486,7 +486,10 @@ async fn write_gen3(
     // Step 1: Set UID via APDU
     update_write_progress(app, machine, 0.1, Some(1), Some(total))?;
     // Extract UID without spaces/colons for gen3uid command
-    let clean_uid: String = source_uid.chars().filter(|c| c.is_ascii_hexdigit()).collect();
+    let clean_uid: String = source_uid
+        .chars()
+        .filter(|c| c.is_ascii_hexdigit())
+        .collect();
     let cmd = command_builder::build_mf_gen3uid(&clean_uid);
     let output = connection::run_command(app, port, &cmd).await?;
     check_write_output(&output)?;
@@ -601,9 +604,9 @@ async fn finish_write(
 ) -> Result<WizardState, AppError> {
     update_write_progress(app, machine, 1.0, None, None)?;
 
-    let mut m = machine.lock().map_err(|e| {
-        AppError::CommandFailed(format!("State lock poisoned: {}", e))
-    })?;
+    let mut m = machine
+        .lock()
+        .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
     m.transition(WizardAction::WriteFinished)?;
     Ok(m.current.clone())
 }
@@ -616,9 +619,9 @@ fn update_write_progress(
     current_step: Option<u16>,
     total_steps: Option<u16>,
 ) -> Result<(), AppError> {
-    let mut m = machine.lock().map_err(|e| {
-        AppError::CommandFailed(format!("State lock poisoned: {}", e))
-    })?;
+    let mut m = machine
+        .lock()
+        .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
     m.transition(WizardAction::UpdateWriteProgress {
         progress,
         current_block: current_step,
@@ -659,9 +662,9 @@ fn report_error(
     recoverable: bool,
     recovery_action: Option<RecoveryAction>,
 ) -> Result<WizardState, AppError> {
-    let mut m = machine.lock().map_err(|e| {
-        AppError::CommandFailed(format!("State lock poisoned: {}", e))
-    })?;
+    let mut m = machine
+        .lock()
+        .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
     m.transition(WizardAction::ReportError {
         message: message.to_string(),
         user_message: user_message.to_string(),
@@ -695,9 +698,9 @@ pub async fn hf_verify_clone(
 ) -> Result<WizardState, AppError> {
     // Guard: must be in Verifying state
     let port = {
-        let m = machine.lock().map_err(|e| {
-            AppError::CommandFailed(format!("State lock poisoned: {}", e))
-        })?;
+        let m = machine
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
         match &m.current {
             WizardState::Verifying => {}
             other => {
@@ -707,9 +710,9 @@ pub async fn hf_verify_clone(
                 )));
             }
         }
-        m.port.clone().ok_or_else(|| {
-            AppError::InvalidTransition("No port in machine state".to_string())
-        })?
+        m.port
+            .clone()
+            .ok_or_else(|| AppError::InvalidTransition("No port in machine state".to_string()))?
     };
 
     // Step 1: hf search — confirm card responds and extract UID
@@ -739,9 +742,9 @@ pub async fn hf_verify_clone(
     };
 
     if !uid_match {
-        let mut m = machine.lock().map_err(|e| {
-            AppError::CommandFailed(format!("State lock poisoned: {}", e))
-        })?;
+        let mut m = machine
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
         m.transition(WizardAction::VerificationResult {
             success: false,
             mismatched_blocks: vec![0], // block 0 = UID mismatch sentinel
@@ -767,25 +770,11 @@ pub async fn hf_verify_clone(
         | BlankType::MagicMifareGen4GTU
         | BlankType::MagicMifareGen4GDM => {
             // Gen2/Gen3/Gen4: read back using recovered keys
-            verify_readback(
-                &app,
-                &port,
-                command_builder::build_mf_dump(),
-                &hf_state,
-                16,
-            )
-            .await
+            verify_readback(&app, &port, command_builder::build_mf_dump(), &hf_state, 16).await
         }
         BlankType::MagicUltralight => {
             // UL/NTAG: dump pages and compare
-            verify_readback(
-                &app,
-                &port,
-                command_builder::build_mfu_dump(),
-                &hf_state,
-                4,
-            )
-            .await
+            verify_readback(&app, &port, command_builder::build_mfu_dump(), &hf_state, 4).await
         }
         BlankType::IClassBlank => {
             // iCLASS: dump blocks and compare
@@ -803,9 +792,9 @@ pub async fn hf_verify_clone(
 
     let success = mismatched_blocks.is_empty();
 
-    let mut m = machine.lock().map_err(|e| {
-        AppError::CommandFailed(format!("State lock poisoned: {}", e))
-    })?;
+    let mut m = machine
+        .lock()
+        .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
     m.transition(WizardAction::VerificationResult {
         success,
         mismatched_blocks,
@@ -838,9 +827,7 @@ async fn verify_readback(
     let original_path = hf_state.dump_path.lock().ok().and_then(|l| l.clone());
 
     match (original_path, readback_path) {
-        (Some(ref orig), Some(ref readback)) => {
-            compare_dump_files(orig, readback, block_size)
-        }
+        (Some(ref orig), Some(ref readback)) => compare_dump_files(orig, readback, block_size),
         _ => vec![], // No files to compare, UID matched = success
     }
 }

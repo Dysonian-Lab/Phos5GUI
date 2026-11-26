@@ -203,6 +203,28 @@ export const CARD_DISPLAY: Record<CardType, CardDisplayInfo> = {
     blankType: 'IClassBlank',
     description: '13.56 MHz HID iCLASS/iCLASS SE smart card',
   },
+
+  Hitag2: { displayName: 'Hitag2', frequency: 'LF', blankType: 'T5577', description: 'Hitag2 proximity card' },
+  PaxtonNet2: { displayName: 'Paxton Net2', frequency: 'LF', blankType: 'T5577', description: 'Paxton Net2 (Hitag2)' },
+  PaxtonSwitch2: { displayName: 'Paxton Switch2', frequency: 'LF', blankType: 'T5577', description: 'Paxton Switch2 (Hitag2)' },
+  Topaz: { displayName: 'Topaz/Jewel', frequency: 'HF', blankType: 'T5577', description: 'Topaz NFC tag' },
+  ISO14443B: { displayName: 'ISO 14443-B', frequency: 'HF', blankType: 'T5577', description: 'ISO 14443-B card' },
+  ISO15693ICODE: { displayName: 'ISO 15693 ICODE', frequency: 'HF', blankType: 'IClassBlank', description: 'ISO 15693 ICODE' },
+  ISO15693ST: { displayName: 'ISO 15693 ST', frequency: 'HF', blankType: 'IClassBlank', description: 'ISO 15693 ST' },
+  Legic: { displayName: 'LEGIC', frequency: 'HF', blankType: 'IClassBlank', description: 'LEGIC card' },
+  Felica: { displayName: 'FeliCa', frequency: 'HF', blankType: 'T5577', description: 'FeliCa card' },
+  MifareClassicMini: { displayName: 'MIFARE Classic Mini', frequency: 'HF', blankType: 'MagicMifareGen1a', description: 'MIFARE Classic Mini' },
+  MifareClassicPlus2K: { displayName: 'MIFARE Classic Plus 2K', frequency: 'HF', blankType: 'MagicMifareGen1a', description: 'MIFARE Classic Plus 2K' },
+  MifareClassicPossible: { displayName: 'MIFARE Classic Possible', frequency: 'HF', blankType: 'MagicMifareGen1a', description: 'MIFARE Classic Possible' },
+  MifareUltralightC: { displayName: 'MIFARE Ultralight C', frequency: 'HF', blankType: 'MagicUltralight', description: 'MIFARE Ultralight C' },
+  MifareUltralightEV1: { displayName: 'MIFARE Ultralight EV1', frequency: 'HF', blankType: 'MagicUltralight', description: 'MIFARE Ultralight EV1' },
+  NTAG213: { displayName: 'NTAG 213', frequency: 'HF', blankType: 'MagicUltralight', description: 'NTAG 213' },
+  NTAG215: { displayName: 'NTAG 215', frequency: 'HF', blankType: 'MagicUltralight', description: 'NTAG 215' },
+  NTAG216: { displayName: 'NTAG 216', frequency: 'HF', blankType: 'MagicUltralight', description: 'NTAG 216' },
+  IClassElite: { displayName: 'iCLASS Elite', frequency: 'HF', blankType: 'IClassBlank', description: 'iCLASS Elite' },
+  IClassSE: { displayName: 'iCLASS SE', frequency: 'HF', blankType: 'IClassBlank', description: 'iCLASS SE' },
+  EM4305: { displayName: 'EM4305', frequency: 'LF', blankType: 'EM4305', description: 'EM4305 card' },
+  T55xx: { displayName: 'T55xx', frequency: 'LF', blankType: 'T5577', description: 'T55xx memory card' },
 };
 
 // Blank card display info for the "place blank" step
@@ -272,6 +294,12 @@ export const BLANK_DISPLAY: Record<BlankType, BlankDisplayInfo> = {
     frequency: 'HF',
     description: 'Writable iCLASS compatible credential',
     compatibleWith: ['IClass'],
+  },
+  T55xx: {
+    displayName: 'T55xx',
+    frequency: 'LF',
+    description: 'T55xx blank',
+    compatibleWith: ['T55xx'],
   },
 };
 

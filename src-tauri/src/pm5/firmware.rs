@@ -77,9 +77,16 @@ fn firmware_dirs(variant: Pm5Variant) -> Vec<PathBuf> {
 
     // Production: Tauri resource directory.
     if let Ok(res_dir) = std::env::var("TAURI_RESOURCE_DIR") {
-        let base = PathBuf::from(&res_dir).join("firmware").join("pm5").join(variant.as_str());
+        let base = PathBuf::from(&res_dir)
+            .join("firmware")
+            .join("pm5")
+            .join(variant.as_str());
         dirs.push(base);
-        dirs.push(PathBuf::from(&res_dir).join("firmware").join(variant.as_str()));
+        dirs.push(
+            PathBuf::from(&res_dir)
+                .join("firmware")
+                .join(variant.as_str()),
+        );
     }
 
     // Development: relative to CARGO_MANIFEST_DIR.
@@ -131,7 +138,8 @@ pub fn verify_elf(path: &Path) -> Result<(), AppError> {
     if &header[..4] != ELF_MAGIC {
         return Err(AppError::CommandFailed(format!(
             "Invalid ELF magic in {}: expected \\x7fELF, got {:02X?}",
-            path.display(), &header[..4]
+            path.display(),
+            &header[..4]
         )));
     }
 

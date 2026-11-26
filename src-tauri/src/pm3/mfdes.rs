@@ -1,4 +1,4 @@
-﻿//! `hf mfdes` command construction for PM3 v4.23346 ("Frosty Lemon").
+//! `hf mfdes` command construction for PM3 v4.23346 ("Frosty Lemon").
 //!
 //! Every argument used here was taken from the live client's own `--help`
 //! output, not from the command name. The DESFire commands share a large
@@ -114,7 +114,10 @@ pub fn kdf(v: &str) -> Result<String, String> {
 pub fn keyno(v: &str) -> Result<String, String> {
     let v = v.trim();
     if !DIGITS_RE.is_match(v) {
-        return Err(format!("Key number (-n) must be decimal digits, got '{}'", v));
+        return Err(format!(
+            "Key number (-n) must be decimal digits, got '{}'",
+            v
+        ));
     }
     Ok(v.to_string())
 }
@@ -329,7 +332,18 @@ impl Auth {
 /// `-a` and `-v` are accepted by every subcommand that has any options at all;
 /// the rest vary per command and are gated by the per-subcommand allowlist.
 pub const SHARED: &[&str] = &[
-    "-a", "-v", "-n", "-t", "-k", "--kdf", "-i", "-m", "-c", "--schann", "--aid", "--no-auth",
+    "-a",
+    "-v",
+    "-n",
+    "-t",
+    "-k",
+    "--kdf",
+    "-i",
+    "-m",
+    "-c",
+    "--schann",
+    "--aid",
+    "--no-auth",
 ];
 
 /// Builds `hf mfdes <sub> <flags>`, emitting only the flags in `allowed`.
@@ -393,7 +407,10 @@ pub fn kdf_num(v: &str) -> Result<String, String> {
     let t = v.trim();
     match t {
         "0" | "1" | "2" => Ok(t.to_string()),
-        _ => Err(format!("KDF (--kdf) for chk must be 0, 1 or 2, got '{}'", v)),
+        _ => Err(format!(
+            "KDF (--kdf) for chk must be 0, 1 or 2, got '{}'",
+            v
+        )),
     }
 }
 
@@ -502,7 +519,17 @@ mod tests {
             ..Auth::default()
         };
         let lsapp: &[&str] = &[
-            "-a", "-v", "-n", "-t", "-k", "--kdf", "-i", "-m", "-c", "--schann", "--no-auth",
+            "-a",
+            "-v",
+            "-n",
+            "-t",
+            "-k",
+            "--kdf",
+            "-i",
+            "-m",
+            "-c",
+            "--schann",
+            "--no-auth",
         ];
         assert_eq!(build("lsapp", &a, lsapp), "hf mfdes lsapp --no-auth");
     }
@@ -514,10 +541,7 @@ mod tests {
             verbose: true,
             ..Auth::default()
         };
-        assert_eq!(
-            build("lsapp", &a, &["-a", "-v"]),
-            "hf mfdes lsapp -a -v"
-        );
+        assert_eq!(build("lsapp", &a, &["-a", "-v"]), "hf mfdes lsapp -a -v");
     }
 
     #[test]
@@ -544,7 +568,10 @@ mod tests {
         let mut a = Auth::default();
         a.flag("--fid", "01");
         a.flag("--damslot", "0a");
-        assert_eq!(build("deletefile", &a, &["-a", "-v", "--aid", "--no-auth"]), "hf mfdes deletefile");
+        assert_eq!(
+            build("deletefile", &a, &["-a", "-v", "--aid", "--no-auth"]),
+            "hf mfdes deletefile"
+        );
     }
 
     #[test]

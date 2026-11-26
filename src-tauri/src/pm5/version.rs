@@ -12,7 +12,9 @@ use std::sync::LazyLock;
 use regex::Regex;
 use serde::Serialize;
 
-use crate::pm5::capabilities::{CLIENT_CAPABILITIES_VERSION, evaluate_capabilities, VersionMatchStatus};
+use crate::pm5::capabilities::{
+    evaluate_capabilities, VersionMatchStatus, CLIENT_CAPABILITIES_VERSION,
+};
 
 /// Parsed PM5 hw version output.
 #[derive(Debug, Clone, Serialize)]
@@ -27,13 +29,13 @@ pub struct Pm5HwVersion {
 /// Regex to extract the capabilities version from hw version output.
 /// Matches patterns like "Capabilities: v13" or "capabilities_version=13".
 static CAPABILITIES_VERSION_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)capabilities[_\s]*version[:\s=]+v?(\d+)").expect("bad capabilities version regex")
+    Regex::new(r"(?i)capabilities[_\s]*version[:\s=]+v?(\d+)")
+        .expect("bad capabilities version regex")
 });
 
 /// Regex to extract the PM5 model string.
-static MODEL_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)(proxmark5|pm5)").expect("bad PM5 model regex")
-});
+static MODEL_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)(proxmark5|pm5)").expect("bad PM5 model regex"));
 
 /// Parse PM5 hw version output into structured info.
 ///

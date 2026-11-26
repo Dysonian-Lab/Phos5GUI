@@ -29,6 +29,7 @@ chrono = { version = "0.4.43", features = ["serde"] }
 serialport = "4.7"
 tauri-plugin-dialog = "2.7.1"
 tauri-plugin-fs = "2.5.1"
+rfd = "0.13"
 
 [profile.dev.package."*"]
 inherits = "dev"

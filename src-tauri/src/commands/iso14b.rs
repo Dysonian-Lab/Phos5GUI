@@ -1,4 +1,4 @@
-﻿use std::sync::Mutex;
+use std::sync::Mutex;
 use tauri::{AppHandle, State};
 
 use crate::error::AppError;
@@ -268,7 +268,7 @@ pub async fn mf_eload(
     connection::run_command(&app, &port, &cmd).await
 }
 
-    /// Emulator: get a single block. `hf mf egetblk -b <n>`.
+/// Emulator: get a single block. `hf mf egetblk -b <n>`.
 #[tauri::command]
 pub async fn mf_egetblk(
     app: AppHandle,
@@ -402,9 +402,9 @@ fn parse_iso14b_output(output: &str) -> Result<crate::Iso14bInfo, AppError> {
 /// which carries no port. Without the fallback every command in this module
 /// failed with "device not connected" after any successful scan.
 fn get_port(machine: &State<'_, Mutex<WizardMachine>>) -> Result<String, AppError> {
-    let m = machine.lock().map_err(|e| {
-        AppError::CommandFailed(format!("State lock poisoned: {}", e))
-    })?;
+    let m = machine
+        .lock()
+        .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
 
     if let WizardState::DeviceConnected { port, .. } = &m.current {
         return Ok(port.clone());
@@ -414,5 +414,7 @@ fn get_port(machine: &State<'_, Mutex<WizardMachine>>) -> Result<String, AppErro
         return Ok(port.clone());
     }
 
-    Err(AppError::InvalidTransition("No device connected".to_string()))
+    Err(AppError::InvalidTransition(
+        "No device connected".to_string(),
+    ))
 }

@@ -27,9 +27,9 @@ pub async fn detect_device(
 ) -> Result<WizardState, AppError> {
     // Transition to DetectingDevice
     {
-        let mut m = machine.lock().map_err(|e| {
-            AppError::CommandFailed(format!("State lock poisoned: {}", e))
-        })?;
+        let mut m = machine
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
         m.transition(WizardAction::StartDetection)?;
     }
 
@@ -42,9 +42,9 @@ pub async fn detect_device(
             // always a firmware or client-build difference.
             logging::device(&port, &model, &firmware, &extract_capabilities(&firmware));
 
-            let mut m = machine.lock().map_err(|e| {
-                AppError::CommandFailed(format!("State lock poisoned: {}", e))
-            })?;
+            let mut m = machine
+                .lock()
+                .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
             m.transition(WizardAction::DeviceFound {
                 port,
                 model,
@@ -78,9 +78,9 @@ pub async fn detect_device(
                 }
                 _ => "No Proxmark3 device found. Check your USB connection.".to_string(),
             };
-            let mut m = machine.lock().map_err(|e| {
-                AppError::CommandFailed(format!("State lock poisoned: {}", e))
-            })?;
+            let mut m = machine
+                .lock()
+                .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
             m.transition(WizardAction::ReportError {
                 message: err_msg,
                 user_message,

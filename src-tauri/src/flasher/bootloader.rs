@@ -1,8 +1,10 @@
 use std::path::Path;
 use std::time::Duration;
 
+use tauri::AppHandle;
 use tokio::time::sleep;
 
+use crate::commands::firmware::FirmwareProgress;
 use crate::error::AppError;
 
 /// How the PM5 device is brought into the bootloader over USB-CDC.
@@ -45,7 +47,10 @@ pub async fn enter_bootloader(
             wait_for_bootloader_port(port).await?;
         }
         BootloaderEntryMethod::AutoDetect => {
-            if crate::flasher::client_flasher::enter_bootloader_software(port).await.is_err() {
+            if crate::flasher::client_flasher::enter_bootloader_software(port)
+                .await
+                .is_err()
+            {
                 // Fall back to hardware-button entry: UI-driven, just wait for re-enumeration.
                 wait_for_bootloader_port(port).await?;
             }
@@ -66,7 +71,9 @@ async fn wait_for_bootloader_port(port: &str) -> Result<(), AppError> {
 /// Wait for the device to re-enumerate as a PM5 application after flashing.
 pub async fn wait_for_pm5_enumeration(port: &str) -> Result<(), AppError> {
     let _ = port;
-    sleep(Duration::from_secs(2)).await;
+    // PM5 with BWM may take longer to re-enumerate after firmware flash.
+    // Wait longer to allow USB-CDC interface to come back up.
+    sleep(Duration::from_secs(6)).await;
     Ok(())
 }
 
@@ -77,11 +84,13 @@ pub async fn wait_for_pm5_enumeration(port: &str) -> Result<(), AppError> {
 ///
 /// Falls back to `pm3-flash-all.exe` if `proxmark3.exe --flash` fails.
 pub async fn flash_via_client_flasher(
+    app: &AppHandle,
     port: &str,
     bootrom_path: &Path,
     fullimage_path: &Path,
 ) -> Result<(), AppError> {
     if let Err(_) = crate::flasher::client_flasher::flash_with_proxmark3(
+        app,
         port,
         bootrom_path,
         fullimage_path,
@@ -89,11 +98,15 @@ pub async fn flash_via_client_flasher(
     .await
     {
         return crate::flasher::client_flasher::flash_with_pm3_flash_all(
+            app,
             port,
             bootrom_path,
             fullimage_path,
         )
         .await;
     }
+    // Wait for PM5 to re-enumerate as application firmware after flash.
+    // PM5 (especially BWM variant) may take several seconds to restart and re-enumerate.
+    wait_for_pm5_enumeration(port).await?;
     Ok(())
 }

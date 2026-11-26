@@ -42,7 +42,7 @@ pub fn emit_output(app: &AppHandle, text: &str, is_error: bool) {
             },
         );
     }
-// Append to the SESSION log rather than writing a file per chunk.
+    // Append to the SESSION log rather than writing a file per chunk.
     //
     // The previous implementation created a NEW numbered file for every output
     // chunk (`read_stream_with_timeout` calls this once per chunk), so a single
@@ -232,9 +232,7 @@ fn is_safe_pm3_command_chain(cmd: &str) -> bool {
         return true;
     }
     let segments: Vec<&str> = cmd.split(';').map(str::trim).collect();
-    segments.len() == 2
-        && segments[0] == "lf t55xx detect"
-        && is_t55xx_memory_cmd(segments[1])
+    segments.len() == 2 && segments[0] == "lf t55xx detect" && is_t55xx_memory_cmd(segments[1])
 }
 
 /// Run a `lf t55xx` memory command with the `lf t55xx detect` prelude that the
@@ -285,7 +283,7 @@ async fn execute_pm3(
         return Err(AppError::CommandFailed(format!("Invalid port: {}", port)));
     }
 
-// Reject command strings containing PM3 command separators or newlines.
+    // Reject command strings containing PM3 command separators or newlines.
     // The PM3 CLI's `-c` flag treats `;` as a delimiter, so a crafted value
     // like "AA;lf t55xx wipe" would execute two commands. Block this at the
     // chokepoint so no caller can accidentally pass through unsanitised input.
@@ -302,7 +300,6 @@ async fn execute_pm3(
             "Invalid characters in command".into(),
         ));
     }
-
 
     // One PM3 process at a time per port. The sidecar path locks per-port inside
     // `run_binary_direct`; the scope-name spawns below lock per-port around each
@@ -368,7 +365,7 @@ async fn execute_pm3(
             Ok(Ok(output)) => output,
         };
 
-// Binary was found and executed -- process the result immediately.
+        // Binary was found and executed -- process the result immediately.
         // No further fallback attempts needed regardless of exit code.
         let code = output.status.code().unwrap_or(-1);
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
@@ -492,9 +489,7 @@ fn is_card_dependent(cmd: &str) -> bool {
         "lf t55xx config",
         "lf t55xx set",
     ];
-    !NOT_CARD_DEPENDENT
-        .iter()
-        .any(|bad| c.starts_with(bad))
+    !NOT_CARD_DEPENDENT.iter().any(|bad| c.starts_with(bad))
 }
 
 /// True when PM3's stdout is nothing but the per-invocation connection banner.
@@ -732,7 +727,10 @@ fn is_long_running(cmd: &str) -> bool {
         // Require the match to end at a boundary so "lf t55xx chk" does not
         // accidentally match a longer command, and so we do not match
         // "lf t55xx chkpwds-style" prefixes by accident.
-        cmd == *l || cmd.strip_prefix(l).is_some_and(|rest| rest.starts_with(' '))
+        cmd == *l
+            || cmd
+                .strip_prefix(l)
+                .is_some_and(|rest| rest.starts_with(' '))
     })
 }
 
@@ -741,11 +739,7 @@ fn is_long_running(cmd: &str) -> bool {
 /// `hf 14b info` with no 14B card present. A 30s wait per panel click is
 /// unacceptable. Most info commands either succeed in 1-2s or fail fast.
 /// Returns the cleaned output, or an AppError::Timeout if the process hangs.
-pub async fn run_command_quick(
-    app: &AppHandle,
-    port: &str,
-    cmd: &str,
-) -> Result<String, AppError> {
+pub async fn run_command_quick(app: &AppHandle, port: &str, cmd: &str) -> Result<String, AppError> {
     emit_output(app, &format!("pm3 --> {} (quick)", cmd), false);
     match execute_pm3(app, port, cmd, DETECT_COMMAND_TIMEOUT, false).await {
         Ok(output) => {
@@ -832,8 +826,10 @@ fn rejected_command(cleaned: &str) -> Option<&'static str> {
 }
 
 static HELP_BANNER_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"-{5,}\s*(operations|recovery|simulation|notice|technical|magic gen|general)\s*-{5,}")
-        .expect("bad help banner regex")
+    Regex::new(
+        r"-{5,}\s*(operations|recovery|simulation|notice|technical|magic gen|general)\s*-{5,}",
+    )
+    .expect("bad help banner regex")
 });
 
 /// Detect PM3 output that means the command never reached the device.
@@ -895,20 +891,36 @@ fn device_failure(cleaned: &str) -> Option<String> {
 
 /// Heuristic: extract the tag type from a PM3 info command so the error
 /// message can say "No 14B tag found" instead of just "timed out".
-fn detect_tag_type(cmd: &str) -> &str {    if cmd.contains("14b") { "ISO 14443-B" }
-    else if cmd.contains("14a") { "ISO 14443-A" }
-    else if cmd.contains("15") { "ISO 15693" }
-    else if cmd.contains("felica") { "Felica" }
-    else if cmd.contains("iclass") { "iCLASS" }
-    else if cmd.contains("legic") { "LEGIC" }
-    else if cmd.contains("mfu") { "MIFARE Ultralight" }
-    else if cmd.contains("mfdes") { "DESFire" }
-    else if cmd.contains("calypso") { "Calypso" }
-    else if cmd.contains("emrtd") { "eMRTD passport" }
-    else if cmd.contains("t55") { "T55xx" }
-    else if cmd.contains("em4305") { "EM4305" }
-    else if cmd.contains("trovan") { "Trovan" }
-    else { "requested" }
+fn detect_tag_type(cmd: &str) -> &str {
+    if cmd.contains("14b") {
+        "ISO 14443-B"
+    } else if cmd.contains("14a") {
+        "ISO 14443-A"
+    } else if cmd.contains("15") {
+        "ISO 15693"
+    } else if cmd.contains("felica") {
+        "Felica"
+    } else if cmd.contains("iclass") {
+        "iCLASS"
+    } else if cmd.contains("legic") {
+        "LEGIC"
+    } else if cmd.contains("mfu") {
+        "MIFARE Ultralight"
+    } else if cmd.contains("mfdes") {
+        "DESFire"
+    } else if cmd.contains("calypso") {
+        "Calypso"
+    } else if cmd.contains("emrtd") {
+        "eMRTD passport"
+    } else if cmd.contains("t55") {
+        "T55xx"
+    } else if cmd.contains("em4305") {
+        "EM4305"
+    } else if cmd.contains("trovan") {
+        "Trovan"
+    } else {
+        "requested"
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -922,6 +934,8 @@ pub struct HfOperationState {
     pub child: Mutex<Option<CommandChild>>,
     /// Dump file path set by autopwn after completion (e.g. "hf-mf-01020304-dump.bin").
     pub dump_path: Mutex<Option<String>>,
+    /// Abort flag for scan pipeline.
+    pub abort: std::sync::atomic::AtomicBool,
 }
 
 impl HfOperationState {
@@ -929,6 +943,7 @@ impl HfOperationState {
         Self {
             child: Mutex::new(None),
             dump_path: Mutex::new(None),
+            abort: std::sync::atomic::AtomicBool::new(false),
         }
     }
 }
@@ -1062,12 +1077,14 @@ pub async fn start_persistent_session(port: &str) -> Result<Pm5Session, AppError
         AppError::CommandFailed(format!("Failed to spawn {}: {e}", program.display()))
     })?;
 
-    let stdin = child.stdin.take().ok_or_else(|| {
-        AppError::CommandFailed("PM3 session stdin unavailable".into())
-    })?;
-    let stdout = child.stdout.take().ok_or_else(|| {
-        AppError::CommandFailed("PM3 session stdout unavailable".into())
-    })?;
+    let stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| AppError::CommandFailed("PM3 session stdin unavailable".into()))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| AppError::CommandFailed("PM3 session stdout unavailable".into()))?;
 
     // Drain stderr in the background so the child never blocks on a full pipe;
     // mirror it to the session log.
@@ -1555,7 +1572,10 @@ async fn probe_port(app: &AppHandle, port: &str) -> Result<String, AppError> {
                 let cleaned = strip_ansi(&stdout);
                 Ok(cleaned)
             }
-            -5 | 251 => Err(AppError::Timeout(format!("PM3 timed out running: {}", "hw version"))),
+            -5 | 251 => Err(AppError::Timeout(format!(
+                "PM3 timed out running: {}",
+                "hw version"
+            ))),
             _ => {
                 let detail = if stderr.is_empty() {
                     strip_ansi(&stdout)
@@ -1595,11 +1615,22 @@ pub async fn probe_device_with_fallback(
     // Layer 1: Direct serial probe
     match probe_device_capabilities(port, baudrate).await {
         Ok(result) => {
-            emit_output(app, &format!("[+] Layer 1 probe succeeded: device capabilities v{}", result.capabilities_version), false);
+            emit_output(
+                app,
+                &format!(
+                    "[+] Layer 1 probe succeeded: device capabilities v{}",
+                    result.capabilities_version
+                ),
+                false,
+            );
             return Ok(result);
         }
         Err(e) => {
-            emit_output(app, &format!("[=] Layer 1 probe failed: {}. Trying Layer 2...", e), false);
+            emit_output(
+                app,
+                &format!("[=] Layer 1 probe failed: {}. Trying Layer 2...", e),
+                false,
+            );
         }
     }
 
@@ -1657,7 +1688,14 @@ pub async fn probe_device_with_fallback(
 
         // Check for capabilities mismatch in stderr
         if let Some((device_ver, client_ver)) = parse_capabilities_mismatch(&stderr) {
-            emit_output(app, &format!("[+] Layer 2 probe succeeded via stderr: device v{}, client v{}", device_ver, client_ver), false);
+            emit_output(
+                app,
+                &format!(
+                    "[+] Layer 2 probe succeeded via stderr: device v{}, client v{}",
+                    device_ver, client_ver
+                ),
+                false,
+            );
             return Ok(ProbeResult {
                 capabilities_version: device_ver,
                 capabilities: None,
@@ -1680,7 +1718,9 @@ pub async fn probe_device_with_fallback(
     }
 
     Err(first_spawn_error.unwrap_or_else(|| {
-        AppError::CommandFailed("Failed to spawn proxmark3 for Layer 2 probe: binary not found".into())
+        AppError::CommandFailed(
+            "Failed to spawn proxmark3 for Layer 2 probe: binary not found".into(),
+        )
     }))
 }
 
@@ -1812,7 +1852,7 @@ async fn run_binary_direct(
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
-        
+
         let mut std_command = std::process::Command::new(&binary_path);
         std_command.args(&["-p", port, "-f", "-c", cmd]);
         std_command.creation_flags(CREATE_NO_WINDOW);
@@ -1831,7 +1871,7 @@ async fn run_binary_direct(
         let output_future = tokio::process::Command::from(std_command)
             .kill_on_drop(true)
             .output();
-let output = match timeout(wait, output_future).await {
+        let output = match timeout(wait, output_future).await {
             Err(_) => {
                 // A timeout is exactly the kind of failure a bug report needs to
                 // show in detail: the child was killed while holding the serial
@@ -1870,7 +1910,7 @@ let output = match timeout(wait, output_future).await {
             }
         };
 
-let code = output.status.code().unwrap_or(-1);
+        let code = output.status.code().unwrap_or(-1);
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
@@ -1888,7 +1928,7 @@ let code = output.status.code().unwrap_or(-1);
 
         interpret_pm3_result(cmd, code, &stdout, &stderr, false)
     }
-    
+
     #[cfg(not(target_os = "windows"))]
     {
         let mut command = tokio::process::Command::new(binary_path);
@@ -1899,7 +1939,7 @@ let code = output.status.code().unwrap_or(-1);
 
         let started = std::time::Instant::now();
         let output_future = command.output();
-let output = match timeout(wait, output_future).await {
+        let output = match timeout(wait, output_future).await {
             Err(_) => {
                 // A timeout is exactly the kind of failure a bug report needs to
                 // show in detail: the child was killed while holding the serial
@@ -1938,7 +1978,7 @@ let output = match timeout(wait, output_future).await {
             }
         };
 
-let code = output.status.code().unwrap_or(-1);
+        let code = output.status.code().unwrap_or(-1);
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
@@ -2009,14 +2049,14 @@ async fn try_sidecar_silent(
 
     let output_future = sidecar.args(["-p", port, "-f", "-c", cmd]).output();
 
-let output = match timeout(wait, output_future).await {
-            Err(_) => {
-                return Err(AppError::Timeout(format!(
-                    "PM3 command timed out after {}s: {}",
-                    wait.as_secs(),
-                    cmd
-                )));
-            }
+    let output = match timeout(wait, output_future).await {
+        Err(_) => {
+            return Err(AppError::Timeout(format!(
+                "PM3 command timed out after {}s: {}",
+                wait.as_secs(),
+                cmd
+            )));
+        }
         Ok(Err(e)) => {
             return Err(AppError::CommandFailed(format!(
                 "Failed to run sidecar: {}",
@@ -2026,9 +2066,9 @@ let output = match timeout(wait, output_future).await {
         Ok(Ok(output)) => output,
     };
 
-let code = output.status.code().unwrap_or(-1);
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    let code = output.status.code().unwrap_or(-1);
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
     interpret_pm3_result(cmd, code, &stdout, &stderr, false)
 }
@@ -2081,7 +2121,11 @@ fn extract_short_version(version_str: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{friendly_exit_code, interpret_pm3_result, is_banner_only, is_card_dependent, is_safe_pm3_command_chain, is_t55xx_memory_cmd, pm3_error_line, rejected_command, validate_interactive_command};
+    use super::{
+        friendly_exit_code, interpret_pm3_result, is_banner_only, is_card_dependent,
+        is_safe_pm3_command_chain, is_t55xx_memory_cmd, pm3_error_line, rejected_command,
+        validate_interactive_command,
+    };
 
     #[test]
     fn interactive_command_rejects_embedded_newlines() {
@@ -2242,12 +2286,18 @@ dump             Dump MIFARE Classic tag to binary file\n";
     }
 
     /// `hf 14b info` returns -5 when no card is found:
-/// `return (found) ? PM3_SUCCESS : PM3_EOPABORTED;` (client/src/cmdhf14b.c).
-/// The error is correct but the wording must say "no tag", not "aborted".
+    /// `return (found) ? PM3_SUCCESS : PM3_EOPABORTED;` (client/src/cmdhf14b.c).
+    /// The error is correct but the wording must say "no tag", not "aborted".
     #[test]
     fn eopaborted_reads_as_no_tag_for_card_commands() {
-        let err = interpret_pm3_result("hf 14b info", -5, "[!] no ISO 14443-B tag found\n", "", false)
-            .expect_err("no 14b tag is a failure");
+        let err = interpret_pm3_result(
+            "hf 14b info",
+            -5,
+            "[!] no ISO 14443-B tag found\n",
+            "",
+            false,
+        )
+        .expect_err("no 14b tag is a failure");
         assert!(err.to_string().contains("No tag detected"), "got: {err}");
     }
 
@@ -2258,7 +2308,10 @@ dump             Dump MIFARE Classic tag to binary file\n";
     fn failed_marker_line_is_surfaced() {
         let got = pm3_error_line("noise\n[!] no ISO 14443-B tag found\n");
         assert_eq!(got.as_deref(), Some("no ISO 14443-B tag found"));
-        assert_eq!(pm3_error_line("[!!] hard failure\n"), Some("hard failure".into()));
+        assert_eq!(
+            pm3_error_line("[!!] hard failure\n"),
+            Some("hard failure".into())
+        );
         assert_eq!(pm3_error_line("[+] all good\n"), None);
         // A bare marker with no text is not a usable message.
         assert_eq!(pm3_error_line("[!!]\n"), None);
@@ -2269,9 +2322,13 @@ dump             Dump MIFARE Classic tag to binary file\n";
     #[test]
     fn only_the_t55xx_detect_chain_is_allowed() {
         // The required chain and its three memory verbs.
-        assert!(is_safe_pm3_command_chain("lf t55xx detect; lf t55xx read -b 0"));
+        assert!(is_safe_pm3_command_chain(
+            "lf t55xx detect; lf t55xx read -b 0"
+        ));
         assert!(is_safe_pm3_command_chain("lf t55xx detect; lf t55xx dump"));
-        assert!(is_safe_pm3_command_chain("lf t55xx detect; lf t55xx write -b 0 -d 00000000 --verify"));
+        assert!(is_safe_pm3_command_chain(
+            "lf t55xx detect; lf t55xx write -b 0 -d 00000000 --verify"
+        ));
         // Plain single commands are untouched.
         assert!(is_safe_pm3_command_chain("hf 14a info"));
         assert!(is_safe_pm3_command_chain("lf t55xx detect"));
@@ -2280,7 +2337,9 @@ dump             Dump MIFARE Classic tag to binary file\n";
         assert!(!is_safe_pm3_command_chain("hf 14a info; hf mf dump"));
         assert!(!is_safe_pm3_command_chain("lf t55xx detect; lf t55xx wipe"));
         assert!(!is_safe_pm3_command_chain("lf t55xx detect; hw version"));
-        assert!(!is_safe_pm3_command_chain("lf t55xx detect; lf t55xx read -b 0; hf mf dump"));
+        assert!(!is_safe_pm3_command_chain(
+            "lf t55xx detect; lf t55xx read -b 0; hf mf dump"
+        ));
         assert!(!is_safe_pm3_command_chain("lf t55xx read -b 0\nhf mf dump"));
     }
 
@@ -2288,7 +2347,9 @@ dump             Dump MIFARE Classic tag to binary file\n";
     fn t55xx_memory_command_classification() {
         assert!(is_t55xx_memory_cmd("lf t55xx read -b 0"));
         assert!(is_t55xx_memory_cmd("lf t55xx dump"));
-        assert!(is_t55xx_memory_cmd("lf t55xx write -b 1 -d 11223344 --verify"));
+        assert!(is_t55xx_memory_cmd(
+            "lf t55xx write -b 1 -d 11223344 --verify"
+        ));
         // Not memory commands -- these must NOT get the prelude.
         assert!(!is_t55xx_memory_cmd("lf t55xx detect"));
         assert!(!is_t55xx_memory_cmd("lf t55xx chk"));

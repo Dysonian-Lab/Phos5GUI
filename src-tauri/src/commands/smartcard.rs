@@ -1,10 +1,10 @@
-use tauri::{AppHandle, State};
 use std::sync::Mutex;
+use tauri::{AppHandle, State};
 
 use crate::error::AppError;
+use crate::pm3::command_builder;
 use crate::pm3::connection;
 use crate::state::{WizardMachine, WizardState};
-use crate::pm3::command_builder;
 
 /// Run `smart pps` — ISO 7816-3 PPS exchange (RDV4 smartcard module required).
 #[tauri::command]
@@ -49,9 +49,9 @@ pub async fn smart_pps_ta1(
 }
 
 fn get_port(machine: &State<'_, Mutex<WizardMachine>>) -> Result<String, AppError> {
-    let m = machine.lock().map_err(|e| {
-        AppError::CommandFailed(format!("State lock poisoned: {}", e))
-    })?;
+    let m = machine
+        .lock()
+        .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
 
     if let WizardState::DeviceConnected { port, .. } = &m.current {
         return Ok(port.clone());
@@ -61,5 +61,7 @@ fn get_port(machine: &State<'_, Mutex<WizardMachine>>) -> Result<String, AppErro
         return Ok(port.clone());
     }
 
-    Err(AppError::InvalidTransition("No device connected".to_string()))
+    Err(AppError::InvalidTransition(
+        "No device connected".to_string(),
+    ))
 }

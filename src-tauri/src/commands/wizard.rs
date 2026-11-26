@@ -9,12 +9,10 @@ use crate::error::AppError;
 use crate::state::{WizardAction, WizardMachine, WizardState};
 
 #[tauri::command]
-pub fn get_wizard_state(
-    machine: State<'_, Mutex<WizardMachine>>,
-) -> Result<WizardState, AppError> {
-    let machine = machine.lock().map_err(|e| {
-        AppError::CommandFailed(format!("State lock poisoned: {}", e))
-    })?;
+pub fn get_wizard_state(machine: State<'_, Mutex<WizardMachine>>) -> Result<WizardState, AppError> {
+    let machine = machine
+        .lock()
+        .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
     Ok(machine.current.clone())
 }
 
@@ -49,6 +47,8 @@ pub enum UserAction {
         decoded: HashMap<String, String>,
         cloneable: bool,
         recommended_blank: BlankType,
+        #[serde(default)]
+        dump_file: Option<String>,
     },
 }
 
@@ -78,6 +78,7 @@ impl UserAction {
                 decoded,
                 cloneable,
                 recommended_blank,
+                dump_file,
             } => WizardAction::LoadSavedCard {
                 frequency,
                 card_type,
@@ -86,6 +87,7 @@ impl UserAction {
                 decoded,
                 cloneable,
                 recommended_blank,
+                dump_file,
             },
         }
     }
@@ -96,9 +98,9 @@ pub fn wizard_action(
     action: UserAction,
     machine: State<'_, Mutex<WizardMachine>>,
 ) -> Result<WizardState, AppError> {
-    let mut machine = machine.lock().map_err(|e| {
-        AppError::CommandFailed(format!("State lock poisoned: {}", e))
-    })?;
+    let mut machine = machine
+        .lock()
+        .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
     machine.transition(action.into_wizard_action())?;
     Ok(machine.current.clone())
 }

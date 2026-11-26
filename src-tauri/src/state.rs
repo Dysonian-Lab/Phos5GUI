@@ -135,6 +135,8 @@ pub enum WizardAction {
         decoded: HashMap<String, String>,
         cloneable: bool,
         recommended_blank: BlankType,
+        #[serde(default)]
+        dump_file: Option<String>,
     },
 }
 
@@ -557,6 +559,7 @@ impl WizardMachine {
                     decoded,
                     cloneable,
                     recommended_blank,
+                    dump_file,
                 },
             ) => WizardState::CardIdentified {
                 frequency: frequency.clone(),
@@ -565,6 +568,8 @@ impl WizardMachine {
                     uid: uid.clone(),
                     raw: raw.clone(),
                     decoded: decoded.clone(),
+                    dump_file: dump_file.clone(),
+                    ..Default::default()
                 },
                 cloneable: *cloneable,
                 recommended_blank: recommended_blank.clone(),

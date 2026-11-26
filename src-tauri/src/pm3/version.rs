@@ -22,9 +22,8 @@ pub struct HwVersionInfo {
 // ---------------------------------------------------------------------------
 
 /// Matches the client version line: `client: Iceman/master/v4.20728-234-g1a2b3c4d5-dirty`
-static CLIENT_VERSION_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)client\s*:\s*(.+)").expect("bad client version regex")
-});
+static CLIENT_VERSION_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)client\s*:\s*(.+)").expect("bad client version regex"));
 
 /// Fallback: captures the first non-empty line after `[ Client ]` section header.
 /// Real PM3 v4.20728+ outputs version directly without `client:` prefix.
@@ -35,24 +34,22 @@ static CLIENT_SECTION_RE: LazyLock<Regex> = LazyLock::new(|| {
 /// Matches the OS (firmware) version line in both formats:
 /// - Old: `os: Iceman/master/v4.20725-100-g9876543ab`
 /// - Real: `OS......... Iceman/master/v4.20728-358-ga2ba91043-suspect`
-static OS_VERSION_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?im)^\s*os[\s.:]+(.+)").expect("bad os version regex")
-});
+static OS_VERSION_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?im)^\s*os[\s.:]+(.+)").expect("bad os version regex"));
 
 /// Extracts commit hash from version string: `v4.20728-234-g1a2b3c4d5-dirty` → `1a2b3c4d5`
+/// Also matches trailing commit hash: `... 2026-11-18 09:18:08 7358cb913` → `7358cb913`
 static COMMIT_HASH_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"-g([0-9a-fA-F]{7,})").expect("bad commit hash regex")
+    Regex::new(r"(?:-g|^|\s)([0-9a-fA-F]{7,})(?:$|[^0-9a-fA-F])").expect("bad commit hash regex")
 });
 
 /// Extracts base version: `v4.20728` from `Iceman/master/v4.20728-234-g...`
-static BASE_VERSION_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"v(\d+\.\d+)").expect("bad base version regex")
-});
+static BASE_VERSION_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"v(\d+\.\d+)").expect("bad base version regex"));
 
 /// Detects AT91SAM7S256 (256K flash variant)
-static UC_256K_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)AT91SAM7S256").expect("bad uc 256k regex")
-});
+static UC_256K_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)AT91SAM7S256").expect("bad uc 256k regex"));
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -124,6 +121,7 @@ pub fn compare_versions(client_ver: &str, os_ver: &str) -> bool {
 /// Detect hardware variant from `hw version` output.
 ///
 /// - `AT91SAM7S256` in uC line → `"generic-256"`
+/// - `AT32F435` or `AT32F437` in uC line → `"pm5"` (Proxmark5)
 /// - `External flash: present` AND `Smartcard reader: present` AND `FPC USART` for BT → `"rdv4-bt"`
 /// - `External flash: present` AND `Smartcard reader: present` → `"rdv4"`
 /// - Otherwise → `"generic"`
@@ -132,18 +130,26 @@ pub fn detect_hardware_variant(output: &str) -> String {
         return "generic-256".to_string();
     }
 
-    let has_ext_flash = output
+    // PM5 detection — AT32F435 or AT32F437 MCU
+    if output
         .lines()
-        .any(|l| l.to_lowercase().contains("external flash") && l.to_lowercase().contains("present"));
+        .any(|l| l.to_lowercase().contains("at32f435") || l.to_lowercase().contains("at32f437"))
+    {
+        return "pm5".to_string();
+    }
+
+    let has_ext_flash = output.lines().any(|l| {
+        l.to_lowercase().contains("external flash") && l.to_lowercase().contains("present")
+    });
     let has_smartcard = output
         .lines()
         .any(|l| l.to_lowercase().contains("smartcard") && l.to_lowercase().contains("present"));
 
     if has_ext_flash && has_smartcard {
         // RDV4 with BlueShark BT addon has FPC USART support
-        let has_bt = output
-            .lines()
-            .any(|l| l.to_lowercase().contains("fpc usart") && l.to_lowercase().contains("present"));
+        let has_bt = output.lines().any(|l| {
+            l.to_lowercase().contains("fpc usart") && l.to_lowercase().contains("present")
+        });
         if has_bt {
             "rdv4-bt".to_string()
         } else {
@@ -171,9 +177,7 @@ fn extract_base_version(version: &str) -> Option<String> {
 fn parse_model(output: &str) -> String {
     for line in output.lines() {
         let trimmed = line.trim();
-        if (trimmed.contains("Prox") && trimmed.contains("RFID"))
-            || trimmed.contains("Proxmark")
-        {
+        if (trimmed.contains("Prox") && trimmed.contains("RFID")) || trimmed.contains("Proxmark") {
             let cleaned = trimmed.trim_matches(|c: char| !c.is_alphanumeric() && c != ' ');
             if !cleaned.is_empty() {
                 return cleaned.to_string();
@@ -345,8 +349,16 @@ OS......... Iceman/master/v4.20728-358-ga2ba91043-suspect 2026-02-09 00:22:17 c0
     #[test]
     fn test_parse_real_pm3_output() {
         let info = parse_detailed_hw_version(SAMPLE_REAL_PM3);
-        assert!(info.client_version.contains("v4.20728"), "client: {}", info.client_version);
-        assert!(info.os_version.contains("v4.20728"), "os: {}", info.os_version);
+        assert!(
+            info.client_version.contains("v4.20728"),
+            "client: {}",
+            info.client_version
+        );
+        assert!(
+            info.os_version.contains("v4.20728"),
+            "os: {}",
+            info.os_version
+        );
         assert!(info.versions_match, "should match — same commit hash");
         assert_eq!(info.hardware_variant, "generic");
     }
@@ -366,8 +378,16 @@ OS......... Iceman/master/v4.20469-164-g0e95c62ad-suspect 2025-08-02 22:16:55 ef
     #[test]
     fn test_parse_real_pm3_mismatch() {
         let info = parse_detailed_hw_version(SAMPLE_REAL_MISMATCH);
-        assert!(info.client_version.contains("v4.20728"), "client: {}", info.client_version);
-        assert!(info.os_version.contains("v4.20469"), "os: {}", info.os_version);
+        assert!(
+            info.client_version.contains("v4.20728"),
+            "client: {}",
+            info.client_version
+        );
+        assert!(
+            info.os_version.contains("v4.20469"),
+            "os: {}",
+            info.os_version
+        );
         assert!(!info.versions_match, "should NOT match — different commits");
     }
 }

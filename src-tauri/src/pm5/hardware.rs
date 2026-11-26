@@ -84,7 +84,8 @@ pub fn parse_antenna_status(raw_bytes: &[u8]) -> Option<AntennaStatus> {
         return None;
     }
 
-    let lf_frequency_hz = u32::from_le_bytes([raw_bytes[0], raw_bytes[1], raw_bytes[2], raw_bytes[3]]);
+    let lf_frequency_hz =
+        u32::from_le_bytes([raw_bytes[0], raw_bytes[1], raw_bytes[2], raw_bytes[3]]);
     let lf_voltage_mv = u16::from_le_bytes([raw_bytes[4], raw_bytes[5]]);
     let hf_voltage_mv = u16::from_le_bytes([raw_bytes[6], raw_bytes[7]]);
     let tuning_active = raw_bytes[8] != 0;

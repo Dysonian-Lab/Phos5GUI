@@ -153,7 +153,9 @@ fn resolve_project_root() -> Result<PathBuf, AppError> {
         }
     }
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    if let Some(root) = find_project_root_from(&manifest).or_else(|| find_runtime_root_from(&manifest)) {
+    if let Some(root) =
+        find_project_root_from(&manifest).or_else(|| find_runtime_root_from(&manifest))
+    {
         return Ok(root);
     }
     Err(AppError::CommandFailed(
@@ -173,7 +175,9 @@ fn toolchain_dir(root: &Path) -> PathBuf {
 }
 
 fn patch_file(root: &Path) -> PathBuf {
-    let sandbox = sandbox_root(root).join("patches").join("comms_relaxed_version.patch");
+    let sandbox = sandbox_root(root)
+        .join("patches")
+        .join("comms_relaxed_version.patch");
     if sandbox.is_file() {
         return sandbox;
     }
@@ -193,7 +197,10 @@ fn toolchain_complete(root: &Path) -> bool {
         tc.join("usr").join("bin").join("bash.exe"),
         tc.join("usr").join("bin").join("make.exe"),
         tc.join("mingw64").join("bin").join("gcc.exe"),
-        tc.join("opt").join("arm-none-eabi").join("bin").join("arm-none-eabi-gcc.exe"),
+        tc.join("opt")
+            .join("arm-none-eabi")
+            .join("bin")
+            .join("arm-none-eabi-gcc.exe"),
     ]
     .iter()
     .all(|p| p.is_file())
@@ -202,10 +209,7 @@ fn toolchain_complete(root: &Path) -> bool {
 /// Prefer the toolchain's bundled git, otherwise fall back to whatever `git` is
 /// on PATH.
 fn resolve_git(root: &Path) -> PathBuf {
-    let seeded = toolchain_dir(root)
-        .join("usr")
-        .join("bin")
-        .join("git.exe");
+    let seeded = toolchain_dir(root).join("usr").join("bin").join("git.exe");
     if seeded.is_file() {
         seeded
     } else {
@@ -351,12 +355,7 @@ pub async fn check_updates(app: &AppHandle) -> Result<UpdateCheckResult, AppErro
     let updates_available = current_commit != latest_commit;
 
     let commit_logs = if updates_available {
-        let raw = git_output(
-            &root,
-            &src,
-            &["log", "HEAD..origin/master", "--oneline"],
-        )
-        .await?;
+        let raw = git_output(&root, &src, &["log", "HEAD..origin/master", "--oneline"]).await?;
         raw.lines()
             .map(|l| l.trim().to_string())
             .filter(|l| !l.is_empty())
@@ -427,9 +426,9 @@ async fn ensure_pm3_src(root: &Path, app: &AppHandle) -> Result<(), AppError> {
     }
 
     let sandbox = sandbox_root(root);
-    tokio::fs::create_dir_all(&sandbox)
-        .await
-        .map_err(|e| AppError::CommandFailed(format!("Failed to create {}: {e}", sandbox.display())))?;
+    tokio::fs::create_dir_all(&sandbox).await.map_err(|e| {
+        AppError::CommandFailed(format!("Failed to create {}: {e}", sandbox.display()))
+    })?;
 
     emit_status(
         app,
@@ -660,7 +659,10 @@ fn copy_file(src: &Path, dst: &Path) -> Result<(), AppError> {
 
 fn dedup(paths: Vec<PathBuf>) -> Vec<PathBuf> {
     let mut seen = std::collections::HashSet::new();
-    paths.into_iter().filter(|p| seen.insert(p.clone())).collect()
+    paths
+        .into_iter()
+        .filter(|p| seen.insert(p.clone()))
+        .collect()
 }
 
 fn client_destinations(app: &AppHandle, root: &Path) -> Vec<PathBuf> {
@@ -676,8 +678,17 @@ fn client_destinations(app: &AppHandle, root: &Path) -> Vec<PathBuf> {
         dirs.push(res.join("proxmark3.exe"));
         dirs.push(res.join("binaries").join("proxmark3").join("proxmark3.exe"));
     }
-    dirs.push(root.join("src-tauri").join("binaries").join("proxmark3").join("proxmark3.exe"));
-    dirs.push(root.join("src-tauri").join("binaries").join("proxmark3.exe"));
+    dirs.push(
+        root.join("src-tauri")
+            .join("binaries")
+            .join("proxmark3")
+            .join("proxmark3.exe"),
+    );
+    dirs.push(
+        root.join("src-tauri")
+            .join("binaries")
+            .join("proxmark3.exe"),
+    );
     dedup(dirs)
 }
 
@@ -687,7 +698,12 @@ fn firmware_destinations(app: &AppHandle, root: &Path) -> Vec<PathBuf> {
         dirs.push(res.join("firmware").join("pm5").join("bwm"));
         dirs.push(res.join("firmware").join("bwm"));
     }
-    dirs.push(root.join("src-tauri").join("firmware").join("pm5").join("bwm"));
+    dirs.push(
+        root.join("src-tauri")
+            .join("firmware")
+            .join("pm5")
+            .join("bwm"),
+    );
     dedup(dirs)
 }
 
@@ -699,7 +715,8 @@ async fn hot_swap(app: &AppHandle, root: &Path) -> Result<Vec<String>, AppError>
         .or_else(|| find_file_recursive(&src.join("client"), "proxmark3", 2))
         .ok_or_else(|| {
             AppError::CommandFailed(
-                "Compiled proxmark3 client was not found in the sandbox after the build.".to_string(),
+                "Compiled proxmark3 client was not found in the sandbox after the build."
+                    .to_string(),
             )
         })?;
 
@@ -708,11 +725,12 @@ async fn hot_swap(app: &AppHandle, root: &Path) -> Result<Vec<String>, AppError>
             "Compiled bootrom.elf was not found in the sandbox after the build.".to_string(),
         )
     })?;
-    let fullimage = find_file_recursive(&src.join("armsrc"), "fullimage.elf", 3).ok_or_else(|| {
-        AppError::CommandFailed(
-            "Compiled fullimage.elf was not found in the sandbox after the build.".to_string(),
-        )
-    })?;
+    let fullimage =
+        find_file_recursive(&src.join("armsrc"), "fullimage.elf", 3).ok_or_else(|| {
+            AppError::CommandFailed(
+                "Compiled fullimage.elf was not found in the sandbox after the build.".to_string(),
+            )
+        })?;
 
     let mut written: Vec<String> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
@@ -726,10 +744,7 @@ async fn hot_swap(app: &AppHandle, root: &Path) -> Result<Vec<String>, AppError>
 
     for dir in firmware_destinations(app, root) {
         for fw in [&bootrom, &fullimage] {
-            let name = fw
-                .file_name()
-                .map(|n| n.to_os_string())
-                .unwrap_or_default();
+            let name = fw.file_name().map(|n| n.to_os_string()).unwrap_or_default();
             let dst = dir.join(name);
             match copy_file(fw, &dst) {
                 Ok(()) => written.push(dst.display().to_string()),
@@ -771,7 +786,12 @@ pub async fn execute_update_pipeline(app: AppHandle, port: String) -> Result<Str
 
     ensure_pm3_src(&root, &app).await?;
 
-    emit_status(&app, PipelineStatus::Fetching, 8, "Fetching upstream master ...");
+    emit_status(
+        &app,
+        PipelineStatus::Fetching,
+        8,
+        "Fetching upstream master ...",
+    );
     git_output(&root, &src, &["fetch", "origin", "master"]).await?;
     let failed_commit = git_output(&root, &src, &["rev-parse", "origin/master"]).await?;
 
@@ -866,13 +886,7 @@ pub async fn execute_update_pipeline(app: AppHandle, port: String) -> Result<Str
     );
     let result = flasher::pm5_provision(&app, &port, "bwm")
         .await
-        .map_err(|e| {
-            emit_failed(
-                &app,
-                &failed_commit,
-                format!("Flashing failed: {e}"),
-            )
-        })?;
+        .map_err(|e| emit_failed(&app, &failed_commit, format!("Flashing failed: {e}")))?;
 
     emit_status(
         &app,
@@ -903,7 +917,10 @@ mod tests {
             "/e/build/sandbox"
         );
         // Non-drive paths are returned unchanged (already POSIX).
-        assert_eq!(to_msys_path(Path::new("/d/already/posix")), "/d/already/posix");
+        assert_eq!(
+            to_msys_path(Path::new("/d/already/posix")),
+            "/d/already/posix"
+        );
     }
 
     #[test]
@@ -917,7 +934,10 @@ mod tests {
     fn stage_labels_map_to_four_user_stages() {
         assert_eq!(stage_label(PipelineStatus::Fetching), STAGE_PULL);
         assert_eq!(stage_label(PipelineStatus::Patching), STAGE_PULL);
-        assert_eq!(stage_label(PipelineStatus::CompilingFirmware), STAGE_FIRMWARE);
+        assert_eq!(
+            stage_label(PipelineStatus::CompilingFirmware),
+            STAGE_FIRMWARE
+        );
         assert_eq!(stage_label(PipelineStatus::CompilingClient), STAGE_CLIENT);
         assert_eq!(stage_label(PipelineStatus::Flashing), STAGE_FLASH);
         assert_eq!(stage_label(PipelineStatus::Complete), STAGE_FLASH);

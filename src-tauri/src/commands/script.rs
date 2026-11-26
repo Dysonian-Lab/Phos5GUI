@@ -1,6 +1,5 @@
 use std::{
-    env,
-    fs,
+    env, fs,
     path::{Path, PathBuf},
     sync::Mutex,
 };
@@ -26,8 +25,9 @@ pub async fn run_script(
     // Write the script to a temp file in the executable directory, then run it by filename.
     let script_dir = get_exe_dir(&app)?;
     if !script_dir.exists() {
-        fs::create_dir_all(&script_dir)
-            .map_err(|e| AppError::CommandFailed(format!("Failed to create executable directory: {}", e)))?;
+        fs::create_dir_all(&script_dir).map_err(|e| {
+            AppError::CommandFailed(format!("Failed to create executable directory: {}", e))
+        })?;
     }
     let temp_name = format!("phosphor_inline_{}.lua", std::process::id());
     let temp_path = script_dir.join(&temp_name);
@@ -51,9 +51,7 @@ pub async fn run_script(
 /// User scripts live in `.proxmark3/scripts/`. Bundled scripts are returned
 /// first and prefixed so users can tell them apart from their own.
 #[tauri::command]
-pub async fn list_scripts(
-    app: AppHandle,
-) -> Result<Vec<String>, AppError> {
+pub async fn list_scripts(app: AppHandle) -> Result<Vec<String>, AppError> {
     let mut scripts = Vec::new();
 
     // 1. Bundled scripts from the resource dir
@@ -97,13 +95,11 @@ pub async fn list_scripts(
 /// Read the content of a script file.
 /// `filename` may be `bundled/<sub>/<name>` or `user/<name>`.
 #[tauri::command]
-pub async fn read_script(
-    app: AppHandle,
-    filename: String,
-) -> Result<String, AppError> {
+pub async fn read_script(app: AppHandle, filename: String) -> Result<String, AppError> {
     let path = resolve_script_path(&app, &filename)?;
-    let content = fs::read_to_string(&path)
-        .map_err(|e| AppError::CommandFailed(format!("Failed to read script file '{}': {}", filename, e)))?;
+    let content = fs::read_to_string(&path).map_err(|e| {
+        AppError::CommandFailed(format!("Failed to read script file '{}': {}", filename, e))
+    })?;
     Ok(content)
 }
 
@@ -119,12 +115,14 @@ pub async fn write_script(
     // Ensure the script directory exists
     if let Some(parent) = file_path.parent() {
         if !parent.exists() {
-            fs::create_dir_all(parent)
-                .map_err(|e| AppError::CommandFailed(format!("Failed to create script directory: {}", e)))?;
+            fs::create_dir_all(parent).map_err(|e| {
+                AppError::CommandFailed(format!("Failed to create script directory: {}", e))
+            })?;
         }
     }
-    fs::write(&file_path, content)
-        .map_err(|e| AppError::CommandFailed(format!("Failed to write script file '{}': {}", filename, e)))?;
+    fs::write(&file_path, content).map_err(|e| {
+        AppError::CommandFailed(format!("Failed to write script file '{}': {}", filename, e))
+    })?;
     Ok(())
 }
 
@@ -134,12 +132,20 @@ pub async fn write_script(
 fn resolve_script_path(app: &AppHandle, name: &str) -> Result<PathBuf, AppError> {
     if let Some(rest) = name.strip_prefix("bundled/") {
         let mut parts = rest.splitn(2, '/');
-        let sub = parts.next().ok_or_else(|| AppError::CommandFailed("bad bundled path".into()))?;
-        let file = parts.next().ok_or_else(|| AppError::CommandFailed("bad bundled path".into()))?;
+        let sub = parts
+            .next()
+            .ok_or_else(|| AppError::CommandFailed("bad bundled path".into()))?;
+        let file = parts
+            .next()
+            .ok_or_else(|| AppError::CommandFailed("bad bundled path".into()))?;
         let resource_dir = app.path().resource_dir().map_err(|e| {
             AppError::CommandFailed(format!("Failed to resolve resource dir: {}", e))
         })?;
-        Ok(resource_dir.join("share").join("proxmark3").join(sub).join(file))
+        Ok(resource_dir
+            .join("share")
+            .join("proxmark3")
+            .join(sub)
+            .join(file))
     } else if let Some(rest) = name.strip_prefix("user/") {
         Ok(get_script_dir(app)?.join(rest))
     } else {
@@ -155,10 +161,14 @@ fn resolve_user_script_path(app: &AppHandle, name: &str) -> Result<PathBuf, AppE
 
 /// Helper function to get the script directory path (.proxmark3/scripts).
 fn get_script_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
-    let exe_path = env::current_exe()
-        .map_err(|e| AppError::CommandFailed(format!("Failed to get current executable path: {}", e)))?;
-    let mut script_dir = exe_path.parent()
-        .ok_or_else(|| AppError::CommandFailed("Failed to get parent directory of executable".to_string()))?
+    let exe_path = env::current_exe().map_err(|e| {
+        AppError::CommandFailed(format!("Failed to get current executable path: {}", e))
+    })?;
+    let mut script_dir = exe_path
+        .parent()
+        .ok_or_else(|| {
+            AppError::CommandFailed("Failed to get parent directory of executable".to_string())
+        })?
         .to_path_buf();
     script_dir.push(".proxmark3");
     script_dir.push("scripts");
@@ -167,17 +177,21 @@ fn get_script_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
 
 /// Helper function to get the executable directory (for temp script runs).
 fn get_exe_dir(app: &AppHandle) -> Result<PathBuf, AppError> {
-    let exe_path = env::current_exe()
-        .map_err(|e| AppError::CommandFailed(format!("Failed to get current executable path: {}", e)))?;
-    Ok(exe_path.parent()
-        .ok_or_else(|| AppError::CommandFailed("Failed to get parent directory of executable".to_string()))?
+    let exe_path = env::current_exe().map_err(|e| {
+        AppError::CommandFailed(format!("Failed to get current executable path: {}", e))
+    })?;
+    Ok(exe_path
+        .parent()
+        .ok_or_else(|| {
+            AppError::CommandFailed("Failed to get parent directory of executable".to_string())
+        })?
         .to_path_buf())
 }
 
 fn get_port(machine: &State<'_, Mutex<WizardMachine>>) -> Result<String, AppError> {
-    let m = machine.lock().map_err(|e| {
-        AppError::CommandFailed(format!("State lock poisoned: {}", e))
-    })?;
+    let m = machine
+        .lock()
+        .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
 
     if let crate::state::WizardState::DeviceConnected { port, .. } = &m.current {
         return Ok(port.clone());
@@ -187,5 +201,7 @@ fn get_port(machine: &State<'_, Mutex<WizardMachine>>) -> Result<String, AppErro
         return Ok(port.clone());
     }
 
-    Err(AppError::InvalidTransition("No device connected".to_string()))
+    Err(AppError::InvalidTransition(
+        "No device connected".to_string(),
+    ))
 }

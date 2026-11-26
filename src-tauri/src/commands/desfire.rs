@@ -1,4 +1,4 @@
-﻿use std::sync::Mutex;
+use std::sync::Mutex;
 use tauri::{AppHandle, State};
 
 use crate::error::AppError;
@@ -63,13 +63,34 @@ mod extras {
 /// `--no-auth`, and `createdelegateapp` has no `-n`. `-a` and `-v` appear
 /// everywhere as the `[-hav]` cluster.
 const FULL_SHARED: &[&str] = &[
-    "-a", "-v", "-n", "-t", "-k", "--kdf", "-i", "-m", "-c", "--schann", "--aid", "--no-auth",
+    "-a",
+    "-v",
+    "-n",
+    "-t",
+    "-k",
+    "--kdf",
+    "-i",
+    "-m",
+    "-c",
+    "--schann",
+    "--aid",
+    "--no-auth",
 ];
 
 /// Shared flags minus `--aid`, used by `lsapp`, `freemem`, `getaids`,
 /// `getappnames`, `getdelegateappinfo` and `brutedamslot`.
 const NO_AID: &[&str] = &[
-    "-a", "-v", "-n", "-t", "-k", "--kdf", "-i", "-m", "-c", "--schann", "--no-auth",
+    "-a",
+    "-v",
+    "-n",
+    "-t",
+    "-k",
+    "--kdf",
+    "-i",
+    "-m",
+    "-c",
+    "--schann",
+    "--no-auth",
 ];
 
 /// Shared flags with `--aid` but without `--no-auth`.
@@ -84,7 +105,17 @@ const NEITHER: &[&str] = &[
 
 /// `createdelegateapp`: no `-n`.
 const NO_KEYNO: &[&str] = &[
-    "-a", "-v", "-t", "-k", "--kdf", "-i", "-m", "-c", "--schann", "--aid", "--no-auth",
+    "-a",
+    "-v",
+    "-t",
+    "-k",
+    "--kdf",
+    "-i",
+    "-m",
+    "-c",
+    "--schann",
+    "--aid",
+    "--no-auth",
 ];
 
 /// `selectisofid` only declares `[-hav]`, `--aid`, `--dfname` and `--isofid`.
@@ -115,10 +146,7 @@ const SUB_EXTRAS: &[(&str, &[&str])] = &[
         "getfilesettings",
         &[extras::ISOID, extras::DFNAME, extras::FID],
     ),
-    (
-        "brutedamslot",
-        &[extras::START, extras::END, extras::STEP],
-    ),
+    ("brutedamslot", &[extras::START, extras::END, extras::STEP]),
     (
         "createmacfile",
         &[
@@ -215,45 +243,186 @@ const DETECT: &[&str] = &[
     "--dfname", "-f", "--save",
 ];
 const DUMP: &[&str] = &[
-    "-a", "-v", "-n", "-t", "-k", "--kdf", "-i", "-m", "-c", "--schann", "--aid", "--no-auth",
-    "--isoid", "--dfname", "-l", "-f", "--keys", "--ns",
+    "-a",
+    "-v",
+    "-n",
+    "-t",
+    "-k",
+    "--kdf",
+    "-i",
+    "-m",
+    "-c",
+    "--schann",
+    "--aid",
+    "--no-auth",
+    "--isoid",
+    "--dfname",
+    "-l",
+    "-f",
+    "--keys",
+    "--ns",
 ];
 const READ: &[&str] = &[
-    "-a", "-v", "-n", "-t", "-k", "--kdf", "-i", "-m", "-c", "--schann", "--aid", "--no-auth",
-    "--fid", "--isoid", "--dfname", "--fileisoid", "--type", "-o", "--isochain",
+    "-a",
+    "-v",
+    "-n",
+    "-t",
+    "-k",
+    "--kdf",
+    "-i",
+    "-m",
+    "-c",
+    "--schann",
+    "--aid",
+    "--no-auth",
+    "--fid",
+    "--isoid",
+    "--dfname",
+    "--fileisoid",
+    "--type",
+    "-o",
+    "--isochain",
 ];
 const WRITE: &[&str] = &[
-    "-a", "-v", "-n", "-t", "-k", "--kdf", "-i", "-m", "-c", "--schann", "--aid", "--no-auth",
-    "--fid", "--isoid", "--fileisoid", "--type", "-o", "-d", "--debit", "--commit",
-    "--updaterec", "--readerid", "--trkey",
+    "-a",
+    "-v",
+    "-n",
+    "-t",
+    "-k",
+    "--kdf",
+    "-i",
+    "-m",
+    "-c",
+    "--schann",
+    "--aid",
+    "--no-auth",
+    "--fid",
+    "--isoid",
+    "--fileisoid",
+    "--type",
+    "-o",
+    "-d",
+    "--debit",
+    "--commit",
+    "--updaterec",
+    "--readerid",
+    "--trkey",
 ];
 const VALUE: &[&str] = &[
-    "-a", "-v", "-n", "-t", "-k", "--kdf", "-i", "-m", "-c", "--schann", "--aid", "--no-auth",
-    "--fid", "--isoid", "-o", "-d",
+    "-a",
+    "-v",
+    "-n",
+    "-t",
+    "-k",
+    "--kdf",
+    "-i",
+    "-m",
+    "-c",
+    "--schann",
+    "--aid",
+    "--no-auth",
+    "--fid",
+    "--isoid",
+    "-o",
+    "-d",
 ];
 const CREATEAPP: &[&str] = &[
-    "-a", "-v", "-n", "-t", "-k", "--kdf", "-i", "-m", "-c", "--schann", "--aid", "--no-auth",
-    "--rawdata", "--fid", "--dfname", "--dfhex", "--ks1", "--ks2", "--dstalgo", "--numkeys",
+    "-a",
+    "-v",
+    "-n",
+    "-t",
+    "-k",
+    "--kdf",
+    "-i",
+    "-m",
+    "-c",
+    "--schann",
+    "--aid",
+    "--no-auth",
+    "--rawdata",
+    "--fid",
+    "--dfname",
+    "--dfhex",
+    "--ks1",
+    "--ks2",
+    "--dstalgo",
+    "--numkeys",
 ];
 const CREATEFILE: &[&str] = &[
-    "-a", "-v", "-n", "-t", "-k", "--kdf", "-i", "-m", "-c", "--schann", "--aid", "--no-auth",
-    "--fid", "--isofid", "--rawtype", "--rawdata", "--amode", "--rawrights", "--rrights",
-    "--wrights", "--rwrights", "--chrights", "--size", "--backup",
+    "-a",
+    "-v",
+    "-n",
+    "-t",
+    "-k",
+    "--kdf",
+    "-i",
+    "-m",
+    "-c",
+    "--schann",
+    "--aid",
+    "--no-auth",
+    "--fid",
+    "--isofid",
+    "--rawtype",
+    "--rawdata",
+    "--amode",
+    "--rawrights",
+    "--rrights",
+    "--wrights",
+    "--rwrights",
+    "--chrights",
+    "--size",
+    "--backup",
 ];
 const CHANGEKEY: &[&str] = &[
-    "-a", "-v", "-n", "-t", "-k", "--kdf", "-i", "-m", "-c", "--schann", "--aid", "--isoid",
-    "--oldalgo", "--oldkey", "--newkeyno", "--newalgo", "--newkey", "--newver",
+    "-a",
+    "-v",
+    "-n",
+    "-t",
+    "-k",
+    "--kdf",
+    "-i",
+    "-m",
+    "-c",
+    "--schann",
+    "--aid",
+    "--isoid",
+    "--oldalgo",
+    "--oldkey",
+    "--newkeyno",
+    "--newalgo",
+    "--newkey",
+    "--newver",
 ];
 const VERIFYCERT: &[&str] = &[
-    "-a", "-v", "-n", "-t", "-k", "--kdf", "-i", "-m", "-c", "--schann", "--aid", "--no-auth",
-    "--isoid", "--dfname", "--fid", "--ca", "--keyaid", "--keyisoid", "--keydfname", "--keyidx",
-    "--validatemethod", "--readmethod",
+    "-a",
+    "-v",
+    "-n",
+    "-t",
+    "-k",
+    "--kdf",
+    "-i",
+    "-m",
+    "-c",
+    "--schann",
+    "--aid",
+    "--no-auth",
+    "--isoid",
+    "--dfname",
+    "--fid",
+    "--ca",
+    "--keyaid",
+    "--keyisoid",
+    "--keydfname",
+    "--keyidx",
+    "--validatemethod",
+    "--readmethod",
 ];
 
 fn get_port(machine: &State<'_, Mutex<WizardMachine>>) -> Result<String, AppError> {
-    let m = machine.lock().map_err(|e| {
-        AppError::CommandFailed(format!("State lock poisoned: {}", e))
-    })?;
+    let m = machine
+        .lock()
+        .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
 
     if let WizardState::DeviceConnected { port, .. } = &m.current {
         return Ok(port.clone());
@@ -263,7 +432,9 @@ fn get_port(machine: &State<'_, Mutex<WizardMachine>>) -> Result<String, AppErro
         return Ok(port.clone());
     }
 
-    Err(AppError::InvalidTransition("No device connected".to_string()))
+    Err(AppError::InvalidTransition(
+        "No device connected".to_string(),
+    ))
 }
 
 /// Every optional extra value, in the canonical order used for emission.
@@ -311,11 +482,7 @@ impl ExtraInputs {
         table
             .iter()
             .filter(|(name, _)| allowed.contains(name))
-            .filter_map(|(name, val)| {
-                val.as_deref()
-                    .and_then(mfdes::opt)
-                    .map(|v| (*name, v))
-            })
+            .filter_map(|(name, val)| val.as_deref().and_then(mfdes::opt).map(|v| (*name, v)))
             .collect()
     }
 }
@@ -542,10 +709,16 @@ pub async fn desfire_detect(
         algo, key, kdf, kdfi, cmode, ccset, schann, aid, keyno, no_auth, apdu, verbose,
     );
     if let Some(v) = isoid.as_deref().and_then(mfdes::opt) {
-        a.flag("--isoid", &mfdes::isoid(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--isoid",
+            &mfdes::isoid(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     if let Some(v) = dfname.as_deref().and_then(mfdes::opt) {
-        a.flag("--dfname", &mfdes::dfname(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--dfname",
+            &mfdes::dfname(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     if let Some(v) = file.as_deref().and_then(mfdes::opt) {
         a.flag("-f", &v);
@@ -594,7 +767,10 @@ pub async fn desfire_chk(
         ));
     }
     if let Some(v) = key.as_deref().and_then(mfdes::opt) {
-        cmd.push_str(&format!(" -k {}", mfdes::key(&v).map_err(AppError::CommandFailed)?));
+        cmd.push_str(&format!(
+            " -k {}",
+            mfdes::key(&v).map_err(AppError::CommandFailed)?
+        ));
     }
     if let Some(v) = file.as_deref().and_then(mfdes::opt) {
         cmd.push_str(&format!(" -f {}", v));
@@ -666,10 +842,16 @@ pub async fn desfire_dump(
         algo, key, kdf, kdfi, cmode, ccset, schann, aid, keyno, no_auth, apdu, verbose,
     );
     if let Some(v) = isoid.as_deref().and_then(mfdes::opt) {
-        a.flag("--isoid", &mfdes::isoid(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--isoid",
+            &mfdes::isoid(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     if let Some(v) = dfname.as_deref().and_then(mfdes::opt) {
-        a.flag("--dfname", &mfdes::dfname(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--dfname",
+            &mfdes::dfname(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     if let Some(v) = length.as_deref().and_then(mfdes::opt) {
         a.flag(
@@ -724,10 +906,16 @@ pub async fn desfire_read(
         a.flag("--fid", &mfdes::fid(&v).map_err(AppError::CommandFailed)?);
     }
     if let Some(v) = isoid.as_deref().and_then(mfdes::opt) {
-        a.flag("--isoid", &mfdes::isoid(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--isoid",
+            &mfdes::isoid(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     if let Some(v) = dfname.as_deref().and_then(mfdes::opt) {
-        a.flag("--dfname", &mfdes::dfname(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--dfname",
+            &mfdes::dfname(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     if let Some(v) = fileisoid.as_deref().and_then(mfdes::opt) {
         a.flag(
@@ -736,10 +924,16 @@ pub async fn desfire_read(
         );
     }
     if let Some(v) = ftype.as_deref().and_then(mfdes::opt) {
-        a.flag("--type", &mfdes::filetype(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--type",
+            &mfdes::filetype(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     if let Some(v) = offset.as_deref().and_then(mfdes::opt) {
-        a.flag("-o", &mfdes::hex3(&v, "Offset (-o)").map_err(AppError::CommandFailed)?);
+        a.flag(
+            "-o",
+            &mfdes::hex3(&v, "Offset (-o)").map_err(AppError::CommandFailed)?,
+        );
     }
     mfdes::validate_auth(&a).map_err(AppError::CommandFailed)?;
     let cmd = mfdes::build("read", &a, READ);
@@ -784,7 +978,10 @@ pub async fn desfire_write(
         a.flag("--fid", &mfdes::fid(&v).map_err(AppError::CommandFailed)?);
     }
     if let Some(v) = isoid.as_deref().and_then(mfdes::opt) {
-        a.flag("--isoid", &mfdes::isoid(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--isoid",
+            &mfdes::isoid(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     if let Some(v) = fileisoid.as_deref().and_then(mfdes::opt) {
         a.flag(
@@ -793,16 +990,25 @@ pub async fn desfire_write(
         );
     }
     if let Some(v) = ftype.as_deref().and_then(mfdes::opt) {
-        a.flag("--type", &mfdes::filetype(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--type",
+            &mfdes::filetype(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     if let Some(v) = offset.as_deref().and_then(mfdes::opt) {
-        a.flag("-o", &mfdes::hex3(&v, "Offset (-o)").map_err(AppError::CommandFailed)?);
+        a.flag(
+            "-o",
+            &mfdes::hex3(&v, "Offset (-o)").map_err(AppError::CommandFailed)?,
+        );
     }
     if let Some(v) = data.as_deref().and_then(mfdes::opt) {
         a.flag("-d", &mfdes::data(&v).map_err(AppError::CommandFailed)?);
     }
     if let Some(v) = readerid.as_deref().and_then(mfdes::opt) {
-        a.flag("--readerid", &mfdes::data(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--readerid",
+            &mfdes::data(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     if let Some(v) = trkey.as_deref().and_then(mfdes::opt) {
         a.flag("--trkey", &mfdes::key(&v).map_err(AppError::CommandFailed)?);
@@ -855,7 +1061,10 @@ pub async fn desfire_value(
         a.flag("--fid", &mfdes::fid(&v).map_err(AppError::CommandFailed)?);
     }
     if let Some(v) = isoid.as_deref().and_then(mfdes::opt) {
-        a.flag("--isoid", &mfdes::isoid(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--isoid",
+            &mfdes::isoid(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     if let Some(v) = operation.as_deref().and_then(mfdes::opt) {
         a.flag("-o", &mfdes::valueop(&v).map_err(AppError::CommandFailed)?);
@@ -947,7 +1156,9 @@ pub async fn desfire_etest(
         _ => {
             return Err(unknown_sub(
                 &action,
-                &["begin", "end", "scan", "fieldoff", "state", "apdu", "random"],
+                &[
+                    "begin", "end", "scan", "fieldoff", "state", "apdu", "random",
+                ],
             ))
         }
     }
@@ -1078,7 +1289,10 @@ pub async fn desfire_createapp(
         algo, key, kdf, kdfi, cmode, ccset, schann, aid, keyno, no_auth, apdu, verbose,
     );
     if let Some(v) = rawdata.as_deref().and_then(mfdes::opt) {
-        a.flag("--rawdata", &mfdes::data(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--rawdata",
+            &mfdes::data(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     if let Some(v) = fid.as_deref().and_then(mfdes::opt) {
         a.flag("--fid", &mfdes::fid(&v).map_err(AppError::CommandFailed)?);
@@ -1087,7 +1301,10 @@ pub async fn desfire_createapp(
         a.flag("--dfname", &name_str(&v)?);
     }
     if let Some(v) = dfhex.as_deref().and_then(mfdes::opt) {
-        a.flag("--dfhex", &mfdes::data(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--dfhex",
+            &mfdes::data(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     if let Some(v) = ks1.as_deref().and_then(mfdes::opt) {
         a.flag("--ks1", &mfdes::data(&v).map_err(AppError::CommandFailed)?);
@@ -1157,13 +1374,22 @@ pub async fn desfire_createfile(
         );
     }
     if let Some(v) = rawtype.as_deref().and_then(mfdes::opt) {
-        a.flag("--rawtype", &mfdes::data(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--rawtype",
+            &mfdes::data(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     if let Some(v) = rawdata.as_deref().and_then(mfdes::opt) {
-        a.flag("--rawdata", &mfdes::data(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--rawdata",
+            &mfdes::data(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     if let Some(v) = amode.as_deref().and_then(mfdes::opt) {
-        a.flag("--amode", &mfdes::cmode(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--amode",
+            &mfdes::cmode(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     for (name, val) in [
         ("--rawrights", &rawrights),
@@ -1221,7 +1447,10 @@ pub async fn desfire_changekey(
         algo, key, kdf, kdfi, cmode, ccset, schann, aid, keyno, no_auth, apdu, verbose,
     );
     if let Some(v) = isoid.as_deref().and_then(mfdes::opt) {
-        a.flag("--isoid", &mfdes::isoid(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--isoid",
+            &mfdes::isoid(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     if let Some(v) = oldalgo.as_deref().and_then(mfdes::opt) {
         a.flag(
@@ -1248,10 +1477,16 @@ pub async fn desfire_changekey(
         );
     }
     if let Some(v) = newkey.as_deref().and_then(mfdes::opt) {
-        a.flag("--newkey", &mfdes::key(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--newkey",
+            &mfdes::key(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     if let Some(v) = newver.as_deref().and_then(mfdes::opt) {
-        a.flag("--newver", &mfdes::data(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--newver",
+            &mfdes::data(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     mfdes::validate_auth(&a).map_err(AppError::CommandFailed)?;
     let cmd = mfdes::build("changekey", &a, CHANGEKEY);
@@ -1396,7 +1631,10 @@ pub async fn desfire_cert(
         cmd.push_str(" -v");
     }
     if let Some(v) = data.as_deref().and_then(mfdes::opt) {
-        cmd.push_str(&format!(" -d {}", mfdes::data(&v).map_err(AppError::CommandFailed)?));
+        cmd.push_str(&format!(
+            " -d {}",
+            mfdes::data(&v).map_err(AppError::CommandFailed)?
+        ));
     }
     if let Some(v) = source.as_deref().and_then(mfdes::opt) {
         let matched = SOURCES
@@ -1483,10 +1721,16 @@ pub async fn desfire_verifycert(
         ));
     }
     if let Some(v) = isoid.as_deref().and_then(mfdes::opt) {
-        a.flag("--isoid", &mfdes::isoid(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--isoid",
+            &mfdes::isoid(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     if let Some(v) = dfname.as_deref().and_then(mfdes::opt) {
-        a.flag("--dfname", &mfdes::dfname(&v).map_err(AppError::CommandFailed)?);
+        a.flag(
+            "--dfname",
+            &mfdes::dfname(&v).map_err(AppError::CommandFailed)?,
+        );
     }
     if let Some(v) = fid.as_deref().and_then(mfdes::opt) {
         a.flag("--fid", &mfdes::fid(&v).map_err(AppError::CommandFailed)?);
@@ -1497,7 +1741,12 @@ pub async fn desfire_verifycert(
         ("--keyisoid", &keyisoid, &[] as &[&str], "key ISO ID"),
         ("--keydfname", &keydfname, &[] as &[&str], "key DF name"),
         ("--keyidx", &keyidx, &[] as &[&str], "key index"),
-        ("--validatemethod", &validatemethod, VALIDATE, "validation method"),
+        (
+            "--validatemethod",
+            &validatemethod,
+            VALIDATE,
+            "validation method",
+        ),
         ("--readmethod", &readmethod, READ, "read method"),
     ] {
         if let Some(v) = val.as_deref().and_then(mfdes::opt) {
@@ -1607,11 +1856,13 @@ pub async fn desfire_makelicense(
 fn name_or_path(v: &str) -> Result<String, AppError> {
     let t = v.trim();
     if t.is_empty() {
-        return Err(AppError::CommandFailed("Value must not be empty".to_string()));
+        return Err(AppError::CommandFailed(
+            "Value must not be empty".to_string(),
+        ));
     }
-    if t.chars().any(|c| {
-        c.is_whitespace() || c == '"' || c == '\'' || c == ';' || c == '&' || c == '|'
-    }) {
+    if t.chars()
+        .any(|c| c.is_whitespace() || c == '"' || c == '\'' || c == ';' || c == '&' || c == '|')
+    {
         return Err(AppError::CommandFailed(format!(
             "Name or path must not contain spaces or quote/semicolon characters, got '{}'",
             v
@@ -1623,7 +1874,11 @@ fn name_or_path(v: &str) -> Result<String, AppError> {
 /// `createapp --dfname` takes an ISO DF name as a plain string.
 fn name_str(v: &str) -> Result<String, AppError> {
     let t = v.trim();
-    if t.is_empty() || !t.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
+    if t.is_empty()
+        || !t
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    {
         return Err(AppError::CommandFailed(format!(
             "DF name (--dfname) must be a non-empty alphanumeric name, got '{}'",
             v
@@ -1631,7 +1886,6 @@ fn name_str(v: &str) -> Result<String, AppError> {
     }
     Ok(t.to_string())
 }
-
 
 #[cfg(test)]
 mod tests {

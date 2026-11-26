@@ -217,4 +217,3 @@ pub async fn pm5_session_stop(state: State<'_, ManagedPm5Session>) -> Result<(),
     state.stop().await;
     Ok(())
 }
-

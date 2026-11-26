@@ -39,9 +39,10 @@ fn strip_win_prefix(path: PathBuf) -> PathBuf {
 }
 
 fn resolve_pm5_firmware(app: &AppHandle, variant: &str) -> Result<(PathBuf, PathBuf), AppError> {
-    let resource_dir = app.path().resource_dir().map_err(|e| {
-        AppError::CommandFailed(format!("Failed to resolve resource dir: {}", e))
-    })?;
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|e| AppError::CommandFailed(format!("Failed to resolve resource dir: {}", e)))?;
 
     let candidates = [
         resource_dir.join("firmware").join("pm5").join(variant),
@@ -96,7 +97,12 @@ pub async fn pm5_provision(app: &AppHandle, port: &str, variant: &str) -> Result
     );
     match client_flasher::enter_bootloader_software(port).await {
         Ok(_) => {
-            emit(app, "bootloader", 20, "Software bootloader command sent. Waiting for re-enumeration...");
+            emit(
+                app,
+                "bootloader",
+                20,
+                "Software bootloader command sent. Waiting for re-enumeration...",
+            );
             sleep(Duration::from_secs(3)).await;
         }
         Err(e) => {
@@ -114,12 +120,7 @@ pub async fn pm5_provision(app: &AppHandle, port: &str, variant: &str) -> Result
     }
 
     // Stage 2: MCU flash (bootrom + fullimage)
-    emit(
-        app,
-        "mcu_flash",
-        30,
-        "[2/4] Flashing bootrom & fullimage",
-    );
+    emit(app, "mcu_flash", 30, "[2/4] Flashing bootrom & fullimage");
     emit(
         app,
         "mcu_flash",
@@ -132,27 +133,22 @@ pub async fn pm5_provision(app: &AppHandle, port: &str, variant: &str) -> Result
         ),
     );
     flash_mcu(app, port, &bootrom_path, &fullimage_path).await?;
-    emit(app, "mcu_flash", 55, "MCU flash complete. Waiting for application firmware...");
+    emit(
+        app,
+        "mcu_flash",
+        55,
+        "MCU flash complete. Waiting for application firmware...",
+    );
     sleep(Duration::from_secs(4)).await;
 
     // Stage 3: FPGA bitstream
-    emit(
-        app,
-        "fpga",
-        65,
-        "[3/4] Flashing FPGA bitstream",
-    );
+    emit(app, "fpga", 65, "[3/4] Flashing FPGA bitstream");
     let fpga_msg = load_fpga_bitstream(app, port).await;
     emit(app, "fpga", 75, fpga_msg);
-    sleep(Duration::from_secs(2)).await;
+    sleep(Duration::from_secs(5)).await;
 
     // Stage 4: Verification
-    emit(
-        app,
-        "verify",
-        85,
-        "[4/4] Verifying BWM & FPGA",
-    );
+    emit(app, "verify", 85, "[4/4] Verifying BWM & FPGA");
     let verification = verify_pm5_state(port).await?;
     emit(app, "verify", 100, verification.clone());
 
@@ -165,17 +161,25 @@ async fn flash_mcu(
     bootrom_path: &Path,
     fullimage_path: &Path,
 ) -> Result<(), AppError> {
-    emit(app, "mcu_flash", 40, "Running proxmark3.exe --flash --unlock-bootloader...");
-    match client_flasher::flash_with_proxmark3(port, bootrom_path, fullimage_path).await {
+    emit(
+        app,
+        "mcu_flash",
+        40,
+        "Running proxmark3.exe --flash --unlock-bootloader...",
+    );
+    match client_flasher::flash_with_proxmark3(app, port, bootrom_path, fullimage_path).await {
         Ok(_) => Ok(()),
         Err(e) => {
             emit(
                 app,
                 "mcu_flash",
                 45,
-                format!("proxmark3 flasher failed ({}). Trying pm3-flash-all fallback...", e),
+                format!(
+                    "proxmark3 flasher failed ({}). Trying pm3-flash-all fallback...",
+                    e
+                ),
             );
-            client_flasher::flash_with_pm3_flash_all(port, bootrom_path, fullimage_path).await
+            client_flasher::flash_with_pm3_flash_all(app, port, bootrom_path, fullimage_path).await
         }
     }
 }
@@ -224,7 +228,10 @@ async fn load_fpga_bitstream(app: &AppHandle, port: &str) -> String {
                 ),
             );
             match ng_protocol::load_fpga_bitstream_raw(port, 115200, &bytes).await {
-                Ok(_) => format!("FPGA bitstream loaded via NG frame ({} bytes).", bytes.len()),
+                Ok(_) => format!(
+                    "FPGA bitstream loaded via NG frame ({} bytes).",
+                    bytes.len()
+                ),
                 Err(e) => format!(
                     "FPGA bitstream load failed: {e}. Verification will confirm FPGA state."
                 ),
@@ -244,8 +251,9 @@ async fn load_fpga_bitstream(app: &AppHandle, port: &str) -> String {
 }
 
 async fn verify_pm5_state(port: &str) -> Result<String, AppError> {
-    // Allow a short settle time after flash/bitstream operations.
-    sleep(Duration::from_secs(2)).await;
+    // Allow a longer settle time after flash/bitstream operations.
+    // PM5 BWM needs time for battery management circuit to initialize.
+    sleep(Duration::from_secs(6)).await;
 
     let mut fpga_ok = false;
     let mut fpga_detail = "unknown".to_string();
@@ -288,7 +296,11 @@ async fn verify_pm5_state(port: &str) -> Result<String, AppError> {
                         "{}% / {} mV{}",
                         status.battery_percent,
                         status.voltage_mv,
-                        if status.is_charging { " (charging)" } else { "" }
+                        if status.is_charging {
+                            " (charging)"
+                        } else {
+                            ""
+                        }
                     );
                     break;
                 } else {

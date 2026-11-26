@@ -488,7 +488,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
                 CardData {
                     uid: uid.clone(),
                     raw: uid,
-                    decoded,
+                    decoded, ..Default::default() 
                 },
             ));
         }
@@ -519,7 +519,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: String::new(),
                 raw: chipset,
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -548,7 +548,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
                 CardData {
                     uid,
                     raw: raw.clone(),
-                    decoded,
+                    decoded, ..Default::default() 
                 },
             ));
         } else if let Some(uid) = uid_val {
@@ -561,7 +561,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
                 CardData {
                     uid: uid.clone(),
                     raw: uid,
-                    decoded,
+                    decoded, ..Default::default() 
                 },
             ));
         }
@@ -619,7 +619,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
                 CardData {
                     uid,
                     raw: String::new(),
-                    decoded,
+                    decoded, ..Default::default() 
                 },
             ));
         }
@@ -641,7 +641,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
                 CardData {
                     uid,
                     raw: String::new(),
-                    decoded,
+                    decoded, ..Default::default() 
                 },
             ));
         }
@@ -656,7 +656,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
                 CardData {
                     uid: hex.clone(),
                     raw: hex,
-                    decoded,
+                    decoded, ..Default::default() 
                 },
             ));
         }
@@ -687,7 +687,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
                 CardData {
                     uid,
                     raw: String::new(),
-                    decoded,
+                    decoded, ..Default::default() 
                 },
             ));
         }
@@ -702,7 +702,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
                 CardData {
                     uid: hex.clone(),
                     raw: hex,
-                    decoded,
+                    decoded, ..Default::default() 
                 },
             ));
         }
@@ -727,7 +727,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
                 CardData {
                     uid,
                     raw: String::new(),
-                    decoded,
+                    decoded, ..Default::default() 
                 },
             ));
         }
@@ -742,7 +742,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
                 CardData {
                     uid: hex.clone(),
                     raw: hex,
-                    decoded,
+                    decoded, ..Default::default() 
                 },
             ));
         }
@@ -775,7 +775,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
                 CardData {
                     uid: cn.clone(),
                     raw: cn,
-                    decoded,
+                    decoded, ..Default::default() 
                 },
             ));
         }
@@ -793,7 +793,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
                 CardData {
                     uid: raw.clone(),
                     raw,
-                    decoded,
+                    decoded, ..Default::default() 
                 },
             ));
         }
@@ -811,7 +811,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
                 CardData {
                     uid: cn.clone(),
                     raw: String::new(),
-                    decoded,
+                    decoded, ..Default::default() 
                 },
             ));
         }
@@ -829,7 +829,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
                 CardData {
                     uid: raw.clone(),
                     raw,
-                    decoded,
+                    decoded, ..Default::default() 
                 },
             ));
         }
@@ -847,7 +847,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
                 CardData {
                     uid: raw.clone(),
                     raw,
-                    decoded,
+                    decoded, ..Default::default() 
                 },
             ));
         }
@@ -863,7 +863,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: "COTAG".to_string(),
                 raw: String::new(),
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -876,7 +876,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: "EM4x50".to_string(),
                 raw: String::new(),
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -889,7 +889,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: "Hitag".to_string(),
                 raw: String::new(),
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -919,14 +919,14 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
             decoded.insert("raw".to_string(), raw.clone());
             return Some((
                 CardType::NexWatch,
-                CardData { uid: raw.clone(), raw, decoded },
+                CardData { uid: raw.clone(), raw, decoded, ..Default::default()  },
             ));
         }
 
         if let Some(id) = card_id {
             return Some((
                 CardType::NexWatch,
-                CardData { uid: id.clone(), raw: id, decoded },
+                CardData { uid: id.clone(), raw: id, decoded, ..Default::default()  },
             ));
         }
 
@@ -934,7 +934,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
         if let Some(hex) = extract_first_hex_block(&clean) {
             return Some((
                 CardType::NexWatch,
-                CardData { uid: hex.clone(), raw: hex, decoded },
+                CardData { uid: hex.clone(), raw: hex, decoded, ..Default::default()  },
             ));
         }
     }
@@ -953,12 +953,12 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
                 decoded.insert("raw".to_string(), raw.clone());
                 return Some((
                     CardType::Viking,
-                    CardData { uid: raw.clone(), raw, decoded },
+                    CardData { uid: raw.clone(), raw, decoded, ..Default::default()  },
                 ));
             }
             return Some((
                 CardType::Viking,
-                CardData { uid: id.clone(), raw: id, decoded },
+                CardData { uid: id.clone(), raw: id, decoded, ..Default::default()  },
             ));
         }
         // Try raw hex pattern
@@ -967,14 +967,14 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
             decoded.insert("raw".to_string(), raw.clone());
             return Some((
                 CardType::Viking,
-                CardData { uid: raw.clone(), raw, decoded },
+                CardData { uid: raw.clone(), raw, decoded, ..Default::default()  },
             ));
         }
         // Last resort: generic hex block
         if let Some(hex) = extract_first_hex_block(&clean) {
             return Some((
                 CardType::Viking,
-                CardData { uid: hex.clone(), raw: hex, decoded },
+                CardData { uid: hex.clone(), raw: hex, decoded, ..Default::default()  },
             ));
         }
     }
@@ -997,7 +997,7 @@ pub fn parse_lf_search(output: &str) -> Option<(CardType, CardData)> {
         };
         return Some((
             card_type,
-            CardData { uid, raw, decoded },
+            CardData { uid, raw, decoded, ..Default::default()  },
         ));
     }
 
@@ -1046,7 +1046,7 @@ pub fn parse_hf_search(output: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid,
                 raw: String::new(),
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1111,7 +1111,7 @@ pub fn parse_hf_search(output: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: uid.clone(),
                 raw: String::new(),
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1126,7 +1126,7 @@ pub fn parse_hf_search(output: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: uid.clone(),
                 raw: String::new(),
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1145,7 +1145,7 @@ pub fn parse_hf_search(output: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: uid.clone(),
                 raw: String::new(),
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1161,7 +1161,7 @@ pub fn parse_hf_search(output: &str) -> Option<(CardType, CardData)> {
                     CardData {
                         uid: uid.clone(),
                         raw: String::new(),
-                        decoded,
+                        decoded, ..Default::default() 
                     },
                 ));
             }
@@ -1173,7 +1173,7 @@ pub fn parse_hf_search(output: &str) -> Option<(CardType, CardData)> {
                     CardData {
                         uid: uid.clone(),
                         raw: String::new(),
-                        decoded,
+                        decoded, ..Default::default() 
                     },
                 ));
             }
@@ -1188,7 +1188,7 @@ pub fn parse_hf_search(output: &str) -> Option<(CardType, CardData)> {
                             CardData {
                                 uid: uid.clone(),
                                 raw: String::new(),
-                                decoded,
+                                decoded, ..Default::default() 
                             },
                         ));
                     }
@@ -1206,7 +1206,7 @@ pub fn parse_hf_search(output: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: uid.clone(),
                 raw: String::new(),
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1217,7 +1217,7 @@ pub fn parse_hf_search(output: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: uid.clone(),
                 raw: String::new(),
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1429,7 +1429,7 @@ fn parse_hid(clean: &str) -> Option<(CardType, CardData)> {
         decoded.insert("raw".to_string(), raw.clone());
     }
 
-    Some((CardType::HIDProx, CardData { uid, raw, decoded }))
+    Some((CardType::HIDProx, CardData { uid, raw, decoded, ..Default::default()  }))
 }
 
 fn parse_ioprox(clean: &str) -> Option<(CardType, CardData)> {
@@ -1459,7 +1459,7 @@ fn parse_ioprox(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid,
                 raw: String::new(),
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1480,7 +1480,7 @@ fn parse_ioprox(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid,
                 raw: String::new(),
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1494,7 +1494,7 @@ fn parse_ioprox(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: uid.clone(),
                 raw: uid,
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1522,7 +1522,7 @@ fn parse_awid(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: uid.clone(),
                 raw: uid,
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1546,7 +1546,7 @@ fn parse_fdxb(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid,
                 raw: String::new(),
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1564,7 +1564,7 @@ fn parse_fdxb(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid,
                 raw: String::new(),
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1578,7 +1578,7 @@ fn parse_fdxb(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: raw.clone(),
                 raw,
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1606,7 +1606,7 @@ fn parse_paradox(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid,
                 raw: decoded.get("raw").cloned().unwrap_or_default(),
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1620,7 +1620,7 @@ fn parse_paradox(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: raw.clone(),
                 raw,
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1633,7 +1633,7 @@ fn parse_paradox(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: raw.clone(),
                 raw,
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1666,7 +1666,7 @@ fn parse_keri(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: id.clone(),
                 raw: decoded.get("raw").cloned().unwrap_or_default(),
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1683,7 +1683,7 @@ fn parse_keri(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: format!("FC{}:CN{}", fc, cn),
                 raw: String::new(),
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1697,7 +1697,7 @@ fn parse_keri(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: raw.clone(),
                 raw,
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1725,7 +1725,7 @@ fn parse_pyramid(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid,
                 raw: decoded.get("raw").cloned().unwrap_or_default(),
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1739,7 +1739,7 @@ fn parse_pyramid(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: raw.clone(),
                 raw,
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1752,7 +1752,7 @@ fn parse_pyramid(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: raw.clone(),
                 raw,
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1776,7 +1776,7 @@ fn parse_presco(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid,
                 raw: String::new(),
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1790,7 +1790,7 @@ fn parse_presco(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: hex.clone(),
                 raw: hex,
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1815,7 +1815,7 @@ fn parse_pac(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: cn,
                 raw: decoded.get("raw").cloned().unwrap_or_default(),
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1829,7 +1829,7 @@ fn parse_pac(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: raw.clone(),
                 raw,
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1858,7 +1858,7 @@ fn parse_noralsy(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: cn,
                 raw,
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -1872,7 +1872,7 @@ fn parse_noralsy(clean: &str) -> Option<(CardType, CardData)> {
             CardData {
                 uid: raw.clone(),
                 raw,
-                decoded,
+                decoded, ..Default::default() 
             },
         ));
     }
@@ -4510,3 +4510,151 @@ mod tests {
 let empty = parse_t5577_detect("");
         assert!(!empty.detected);
     }
+
+// ---------------------------------------------------------------------------
+// Phase 1/2 scan parsers
+// ---------------------------------------------------------------------------
+
+pub fn parse_hf14a_info_output(output: &str) -> Option<(CardType, CardData)> {
+    let clean = strip_ansi(output);
+    let uid_cap = HF_UID_RE.captures(&clean)?;
+    let uid = uid_cap[1].replace([' ', ':'], "");
+    if uid.is_empty() {
+        return None;
+    }
+    let atqa = HF_ATQA_RE
+        .captures(&clean)
+        .map(|c| c[1].to_string())
+        .unwrap_or_default();
+    let sak = HF_SAK_RE
+        .captures(&clean)
+        .map(|c| c[1].to_string())
+        .unwrap_or_default();
+    let mut decoded = std::collections::HashMap::new();
+    decoded.insert("uid".to_string(), uid.clone());
+    if !atqa.is_empty() {
+        decoded.insert("atqa".to_string(), atqa.clone());
+    }
+    if !sak.is_empty() {
+        decoded.insert("sak".to_string(), sak.clone());
+    }
+    let card_type = if sak.eq_ignore_ascii_case("00") {
+        CardType::MifareUltralight
+    } else {
+        CardType::MifareClassic1K
+    };
+    Some((
+        card_type,
+        CardData {
+            uid: uid.clone(),
+            raw: uid.clone(),
+            decoded,
+            ..Default::default()
+        },
+    ))
+}
+
+pub fn parse_felica_reader_output(output: &str) -> Option<(CardType, CardData)> {
+    let clean = strip_ansi(output);
+    let idm_re = regex::Regex::new(r"(?i)IDm\s*[:=]\s*([0-9A-Fa-f\s]+)").ok()?;
+    let idm = idm_re
+        .captures(&clean)
+        .map(|c| c[1].trim().to_string())
+        .unwrap_or_default();
+    if idm.is_empty() {
+        return None;
+    }
+    let pmm_re = regex::Regex::new(r"(?i)PMm\s*[:=]\s*([0-9A-Fa-f\s]+)").ok()?;
+    let pmm = pmm_re
+        .captures(&clean)
+        .map(|c| c[1].trim().to_string())
+        .unwrap_or_default();
+    let sys_re = regex::Regex::new(r"(?i)System Code\s*[:=]\s*([0-9A-Fa-f\s]+)").ok()?;
+    let sys = sys_re
+        .captures(&clean)
+        .map(|c| c[1].trim().to_string())
+        .unwrap_or_default();
+    let mut decoded = std::collections::HashMap::new();
+    decoded.insert("idm".to_string(), idm.clone());
+    if !pmm.is_empty() {
+        decoded.insert("pmm".to_string(), pmm);
+    }
+    if !sys.is_empty() {
+        decoded.insert("system_code".to_string(), sys);
+    }
+    Some((
+        CardType::Felica,
+        CardData {
+            uid: idm.clone(),
+            raw: idm,
+            decoded,
+            ..Default::default()
+        },
+    ))
+}
+
+pub fn parse_hficlass_info_output(output: &str) -> CardType {
+    let clean = strip_ansi(output);
+    if clean.to_lowercase().contains("iclass se") {
+        CardType::IClassSE
+    } else {
+        CardType::IClass
+    }
+}
+
+pub fn parse_hitag_paxton_output(output: &str, key: &str) -> Option<(CardType, CardData)> {
+    let clean = strip_ansi(output);
+    let paxton_re = regex::Regex::new(r"(?i)Paxton\s+id[^0-9A-Fa-f]*([0-9A-Fa-f]+)").ok()?;
+    let paxton_id = paxton_re
+        .captures(&clean)
+        .map(|c| c[1].to_string())
+        .unwrap_or_default();
+    let block_re = regex::Regex::new(r"(?m)^\s*\d+/0x[0-9A-Fa-f]+\s*\|\s*((?:[0-9A-Fa-f]{2}\s*)+)").ok()?;
+    let mut payload = String::new();
+    for cap in block_re.captures_iter(&clean) {
+        let hex = cap[1].replace(' ', "");
+        payload.push_str(&hex);
+    }
+    let mut decoded = std::collections::HashMap::new();
+    if !paxton_id.is_empty() {
+        decoded.insert("paxton_id".to_string(), paxton_id.clone());
+    }
+    if !payload.is_empty() {
+        decoded.insert("payload".to_string(), payload.clone());
+    }
+    let key_upper = key.to_uppercase();
+    let card_type = if paxton_id.is_empty() {
+        CardType::Hitag2
+    } else if key_upper.contains("BDF5E846") {
+        CardType::PaxtonNet2
+    } else if key_upper.contains("4D494B52") {
+        CardType::PaxtonSwitch2
+    } else {
+        CardType::PaxtonNet2
+    };
+    // Extract uid for generic Hitag2 from block 0 / serial
+    let uid = if paxton_id.is_empty() {
+        // try UID line
+        let uid_re = regex::Regex::new(r"(?i)UID\s*:\s*([0-9A-Fa-f\s]+)").ok()?;
+        let u = uid_re
+            .captures(&clean)
+            .map(|c| c[1].trim().replace(' ', ""))
+            .unwrap_or_default();
+        if u.is_empty() {
+            if payload.len() >= 8 { payload[..8].to_string() } else { "Hitag2".to_string() }
+        } else {
+            u
+        }
+    } else {
+        paxton_id.clone()
+    };
+    Some((
+        card_type,
+        CardData {
+            uid: uid.clone(),
+            raw: uid,
+            decoded,
+            ..Default::default()
+        },
+    ))
+}

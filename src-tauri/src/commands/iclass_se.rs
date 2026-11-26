@@ -54,9 +54,9 @@ fn parse_iclass_se_output(output: &str) -> Result<IclassSeInfo, AppError> {
 }
 
 fn get_port(machine: &State<'_, Mutex<WizardMachine>>) -> Result<String, AppError> {
-    let m = machine.lock().map_err(|e| {
-        AppError::CommandFailed(format!("State lock poisoned: {}", e))
-    })?;
+    let m = machine
+        .lock()
+        .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
 
     if let crate::state::WizardState::DeviceConnected { port, .. } = &m.current {
         return Ok(port.clone());
@@ -66,5 +66,7 @@ fn get_port(machine: &State<'_, Mutex<WizardMachine>>) -> Result<String, AppErro
         return Ok(port.clone());
     }
 
-    Err(AppError::InvalidTransition("No device connected".to_string()))
+    Err(AppError::InvalidTransition(
+        "No device connected".to_string(),
+    ))
 }

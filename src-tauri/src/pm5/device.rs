@@ -154,13 +154,7 @@ mod tests {
 
     #[test]
     fn variant_from_features_bwm() {
-        assert!(matches!(
-            variant_from_features(true),
-            Pm5Variant::Bwm
-        ));
-        assert!(matches!(
-            variant_from_features(false),
-            Pm5Variant::Standard
-        ));
+        assert!(matches!(variant_from_features(true), Pm5Variant::Bwm));
+        assert!(matches!(variant_from_features(false), Pm5Variant::Standard));
     }
 }

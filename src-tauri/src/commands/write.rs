@@ -39,13 +39,17 @@ pub async fn write_clone_with_data(
     blank_type: Option<BlankType>,
     machine: State<'_, Mutex<WizardMachine>>,
 ) -> Result<WizardState, AppError> {
-    log::debug!("write_clone_with_data: port={}, card_type={:?}, uid={}, blank_type={:?}", port, card_type, uid, blank_type);
+    log::debug!(
+        "write_clone_with_data: port={}, card_type={:?}, uid={}, blank_type={:?}",
+        port,
+        card_type,
+        uid,
+        blank_type
+    );
 
     // Guard: reject absurdly large decoded maps (prevents DoS via oversized IPC payload)
     if decoded.len() > 50 {
-        return Err(AppError::CommandFailed(
-            "Too many decoded fields".into(),
-        ));
+        return Err(AppError::CommandFailed("Too many decoded fields".into()));
     }
 
     // Validate uid: must be non-empty alphanumeric with optional colons.
@@ -101,10 +105,48 @@ pub async fn write_clone_with_data(
 
     // Transition: BlankDetected -> Writing
     {
-        let mut m = machine.lock().map_err(|e| {
-            AppError::CommandFailed(format!("State lock poisoned: {}", e))
-        })?;
+        let mut m = machine
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
         m.transition(WizardAction::StartWrite)?;
+    }
+
+    // PAC override: never use `lf pac clone` (firmware hang). Write Block 0
+    // config word 00080080 via lf t55xx write, then data blocks.
+    if card_type == CardType::PAC {
+        connection::run_command(&app, &port, "lf t55xx write -b 0 -d 00080080").await?;
+        for (key, val) in &decoded {
+            if let Some(n) = key.strip_prefix("t55xx_blk_") {
+                let cmd = format!("lf t55xx write -b {} -d {}", n, val);
+                let _ = connection::run_command(&app, &port, &cmd).await;
+            }
+        }
+        let mut m = machine.lock().map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
+        m.transition(WizardAction::WriteFinished)?;
+        return Ok(m.current.clone());
+    }
+
+    // Hitag2 / Paxton write path
+    if card_type == CardType::Hitag2 || card_type == CardType::PaxtonNet2 || card_type == CardType::PaxtonSwitch2 {
+        let key = match card_type {
+            CardType::PaxtonNet2 => "BDF5E846",
+            CardType::PaxtonSwitch2 => "4D494B52",
+            _ => "BDF5E846",
+        };
+        let hex = decoded.get("raw").cloned().unwrap_or_else(|| uid.clone());
+        // pages 4..7, 8 hex chars each
+        for (i, page) in (4u8..=7).enumerate() {
+            let start = i * 8;
+            let end = start + 8;
+            if end <= hex.len() {
+                let chunk = &hex[start..end];
+                let cmd = format!("lf hitag wrbl --ht2 -p {} -d {} -k {}", page, chunk, key);
+                let _ = connection::run_command(&app, &port, &cmd).await;
+            }
+        }
+        let mut m = machine.lock().map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
+        m.transition(WizardAction::WriteFinished)?;
+        return Ok(m.current.clone());
     }
 
     // Branch based on blank type.
@@ -161,9 +203,9 @@ pub async fn write_clone_with_data(
         }
         _ => {
             // Other blank types not yet supported for LF
-            let mut m = machine.lock().map_err(|e| {
-                AppError::CommandFailed(format!("State lock poisoned: {}", e))
-            })?;
+            let mut m = machine
+                .lock()
+                .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
             m.transition(WizardAction::ReportError {
                 message: format!("Unsupported blank type {:?} for LF cloning", blank),
                 user_message: "This blank type is not supported for LF card cloning.".to_string(),
@@ -193,7 +235,11 @@ async fn write_t5577_flow(
     let detect_out =
         connection::run_command(app, port, command_builder::build_t5577_detect()).await?;
     let t5577_status = output_parser::parse_t5577_detect(&detect_out);
-    log::debug!("T5577 detect: detected={}, pw={}", t5577_status.detected, t5577_status.password_set);
+    log::debug!(
+        "T5577 detect: detected={}, pw={}",
+        t5577_status.detected,
+        t5577_status.password_set
+    );
 
     if !t5577_status.detected {
         return report_error(
@@ -248,11 +294,8 @@ async fn write_t5577_flow(
     if password.is_some() {
         update_progress(app, machine, 0.35, Some(2), Some(T5577_TOTAL_STEPS))?;
 
-        let wipe_cmd =
-            command_builder::build_wipe_command(&BlankType::T5577, password.as_deref())
-                .ok_or_else(|| {
-                    AppError::CommandFailed("No wipe command for this blank type".into())
-                })?;
+        let wipe_cmd = command_builder::build_wipe_command(&BlankType::T5577, password.as_deref())
+            .ok_or_else(|| AppError::CommandFailed("No wipe command for this blank type".into()))?;
         connection::run_command(app, port, &wipe_cmd).await?;
 
         // Verify wipe — ensure T5577 is detected and no longer password-protected.
@@ -282,7 +325,12 @@ async fn write_t5577_flow(
     // Step 5: Clone
     update_progress(app, machine, 0.7, Some(4), Some(T5577_TOTAL_STEPS))?;
 
-    log::debug!("Clone: uid={}, type={:?}, decoded={:?}", uid, card_type, decoded);
+    log::debug!(
+        "Clone: uid={}, type={:?}, decoded={:?}",
+        uid,
+        card_type,
+        decoded
+    );
 
     let base_clone_cmd = command_builder::build_clone_command(card_type, uid, decoded);
 
@@ -291,8 +339,9 @@ async fn write_t5577_flow(
     match base_clone_cmd {
         Some(cmd) => {
             let final_cmd = match &password {
-                Some(pw) => command_builder::build_clone_with_password(&cmd, pw)
-                    .map_err(|e| AppError::CommandFailed(format!("Password validation failed: {}", e)))?,
+                Some(pw) => command_builder::build_clone_with_password(&cmd, pw).map_err(|e| {
+                    AppError::CommandFailed(format!("Password validation failed: {}", e))
+                })?,
                 None => cmd,
             };
             log::debug!("sending={}", final_cmd);
@@ -320,15 +369,22 @@ async fn write_t5577_flow(
             } else {
                 connection::run_command(app, port, &final_cmd).await
             };
-            log::debug!("clone_result={:?}", clone_output.as_ref().map(|s| s.chars().take(500).collect::<String>()).map_err(|e| e.to_string()));
+            log::debug!(
+                "clone_result={:?}",
+                clone_output
+                    .as_ref()
+                    .map(|s| s.chars().take(500).collect::<String>())
+                    .map_err(|e| e.to_string())
+            );
             let clone_output = clone_output?;
             // Check for failure indicators in PM3 output
-            if clone_output.contains("[!!]")
-                || clone_output.to_lowercase().contains("fail")
-            {
+            if clone_output.contains("[!!]") || clone_output.to_lowercase().contains("fail") {
                 return report_error(
                     machine,
-                    &format!("Clone command may have failed: {}", clone_output.chars().take(200).collect::<String>()),
+                    &format!(
+                        "Clone command may have failed: {}",
+                        clone_output.chars().take(200).collect::<String>()
+                    ),
                     "Write may have failed. Do not remove the card — try again.",
                     true,
                     Some(RecoveryAction::Retry),
@@ -381,16 +437,16 @@ async fn write_t5577_flow(
     // Step 6: Done writing -> Verifying transition
     update_progress(app, machine, 1.0, Some(5), Some(T5577_TOTAL_STEPS))?;
     {
-        let mut m = machine.lock().map_err(|e| {
-            AppError::CommandFailed(format!("State lock poisoned: {}", e))
-        })?;
+        let mut m = machine
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
         m.transition(WizardAction::WriteFinished)?;
     }
 
     Ok({
-        let m = machine.lock().map_err(|e| {
-            AppError::CommandFailed(format!("State lock poisoned: {}", e))
-        })?;
+        let m = machine
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
         m.current.clone()
     })
 }
@@ -402,7 +458,9 @@ async fn write_t5577_flow(
 /// other) while still carrying the config blocks that make it a universal tag.
 fn has_t55xx_blocks(decoded: &std::collections::HashMap<String, String>) -> bool {
     use crate::pm3::command_builder::T55XX_BLOCK_KEY_PREFIX;
-    decoded.keys().any(|k| k.starts_with(T55XX_BLOCK_KEY_PREFIX))
+    decoded
+        .keys()
+        .any(|k| k.starts_with(T55XX_BLOCK_KEY_PREFIX))
 }
 
 /// Write the source T55xx's config blocks onto the blank on the reader.
@@ -459,8 +517,7 @@ async fn write_em4305_flow(
     // Mirrors the T5577 detect step to prevent wiping air / wrong chip.
     update_progress(app, machine, 0.1, Some(0), Some(EM4305_TOTAL_STEPS))?;
 
-    let info_out =
-        connection::run_command(app, port, command_builder::build_em4305_info()).await?;
+    let info_out = connection::run_command(app, port, command_builder::build_em4305_info()).await?;
 
     if !output_parser::parse_em4305_info(&info_out) {
         return report_error(
@@ -511,12 +568,13 @@ async fn write_em4305_flow(
             let em_cmd = command_builder::build_clone_for_em4305(&cmd);
             let clone_output = connection::run_command(app, port, &em_cmd).await?;
             // Check for failure indicators in PM3 output
-            if clone_output.contains("[!!]")
-                || clone_output.to_lowercase().contains("fail")
-            {
+            if clone_output.contains("[!!]") || clone_output.to_lowercase().contains("fail") {
                 return report_error(
                     machine,
-                    &format!("EM4305 clone may have failed: {}", clone_output.chars().take(200).collect::<String>()),
+                    &format!(
+                        "EM4305 clone may have failed: {}",
+                        clone_output.chars().take(200).collect::<String>()
+                    ),
                     "Write may have failed. Do not remove the card — try again.",
                     true,
                     Some(RecoveryAction::Retry),
@@ -537,16 +595,16 @@ async fn write_em4305_flow(
     // Step 5: Done -> Verifying
     update_progress(app, machine, 1.0, Some(4), Some(EM4305_TOTAL_STEPS))?;
     {
-        let mut m = machine.lock().map_err(|e| {
-            AppError::CommandFailed(format!("State lock poisoned: {}", e))
-        })?;
+        let mut m = machine
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
         m.transition(WizardAction::WriteFinished)?;
     }
 
     Ok({
-        let m = machine.lock().map_err(|e| {
-            AppError::CommandFailed(format!("State lock poisoned: {}", e))
-        })?;
+        let m = machine
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
         m.current.clone()
     })
 }
@@ -570,9 +628,9 @@ pub async fn verify_clone(
     // Without this check, a call from the wrong state would waste a PM3
     // command before failing on the FSM transition.
     {
-        let m = machine.lock().map_err(|e| {
-            AppError::CommandFailed(format!("State lock poisoned: {}", e))
-        })?;
+        let m = machine
+            .lock()
+            .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
         match &m.current {
             WizardState::Verifying => {}
             other => {
@@ -617,10 +675,7 @@ pub async fn verify_clone(
                 "uid compare"
             }
         ),
-        &format!(
-            "success={} mismatched={:?}",
-            success, mismatched
-        ),
+        &format!("success={} mismatched={:?}", success, mismatched),
     );
     if !success {
         logging::line("Verification FAILED. Raw verification output follows:");
@@ -638,9 +693,9 @@ pub async fn verify_clone(
         }
     }
 
-    let mut m = machine.lock().map_err(|e| {
-        AppError::CommandFailed(format!("State lock poisoned: {}", e))
-    })?;
+    let mut m = machine
+        .lock()
+        .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
     m.transition(WizardAction::VerificationResult {
         success,
         mismatched_blocks: mismatched.clone(),
@@ -671,9 +726,9 @@ fn update_progress(
     current_block: Option<u16>,
     total_blocks: Option<u16>,
 ) -> Result<(), AppError> {
-    let mut m = machine.lock().map_err(|e| {
-        AppError::CommandFailed(format!("State lock poisoned: {}", e))
-    })?;
+    let mut m = machine
+        .lock()
+        .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
     m.transition(WizardAction::UpdateWriteProgress {
         progress,
         current_block,
@@ -700,9 +755,9 @@ fn report_error(
     recoverable: bool,
     recovery_action: Option<RecoveryAction>,
 ) -> Result<WizardState, AppError> {
-    let mut m = machine.lock().map_err(|e| {
-        AppError::CommandFailed(format!("State lock poisoned: {}", e))
-    })?;
+    let mut m = machine
+        .lock()
+        .map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
     m.transition(WizardAction::ReportError {
         message: message.to_string(),
         user_message: user_message.to_string(),
@@ -744,11 +799,10 @@ mod tests {
     /// written card, but block 0 alone still reproduces the tag.
     #[test]
     fn single_block_is_enough_to_route() {
-        let decoded: std::collections::HashMap<String, String> =
-            [("t55xx_blk_0", "00148040")]
-                .iter()
-                .map(|(k, v)| (k.to_string(), v.to_string()))
-                .collect();
+        let decoded: std::collections::HashMap<String, String> = [("t55xx_blk_0", "00148040")]
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
         assert!(has_t55xx_blocks(&decoded));
     }
 
@@ -787,4 +841,28 @@ mod tests {
         .collect();
         assert!(!has_t55xx_blocks(&decoded));
     }
+}
+
+
+/// PAC override: never use `lf pac clone`. Write Block 0 config word 00080080
+/// (Direct modulation, RF/32, maxblock 4) via lf t55xx write, then data blocks.
+pub async fn write_pac_override(
+    app: &AppHandle,
+    port: &str,
+) -> Result<(), AppError> {
+    let _ = connection::run_command(app, port, "lf t55xx write -b 0 -d 00080080").await?;
+    Ok(())
+}
+
+/// Hitag2 / Paxton write path using lf hitag wrbl.
+pub async fn write_hitag2_paxton(
+    app: &AppHandle,
+    port: &str,
+    page: u8,
+    data: &str,
+    key: &str,
+) -> Result<(), AppError> {
+    let cmd = format!("lf hitag wrbl --ht2 -p {} -d {} -k {}", page, data, key);
+    let _ = connection::run_command(app, port, &cmd).await?;
+    Ok(())
 }
