@@ -652,12 +652,23 @@ pub async fn read_iclass_card(
     app: AppHandle,
     port: String,
     card_data: crate::cards::types::CardData,
+    custom_key: Option<String>,
 ) -> Result<String, AppError> {
     let dumps_dir = get_dumps_dir();
     let uid = card_data.uid.clone();
-    // Automated key trial sequence per plan
-    let keys = ["--ki 0", "-k AEA684A6DAB23278", "-k 2020666666668888"];
-    for k in keys {
+
+    // Build key rotation list: custom key first (if provided), then standard dictionary
+    let mut keys: Vec<String> = Vec::new();
+    if let Some(ref k) = custom_key {
+        if !k.trim().is_empty() {
+            keys.push(format!("-k {}", k.trim()));
+        }
+    }
+    keys.push("--ki 0".to_string());
+    keys.push("-k AEA684A6DAB23278".to_string());
+    keys.push("-k 2020666666668888".to_string());
+
+    for k in &keys {
         let cmd = format!("hf iclass dump {}", k);
         if connection::run_command(&app, &port, &cmd).await.is_ok() {
             // verify dump file on disk
