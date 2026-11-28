@@ -114,7 +114,7 @@ pub async fn write_clone_with_data(
     // PAC override: never use `lf pac clone` (firmware hang). Write Block 0
     // config word 00080080 via lf t55xx write, then data blocks.
     if card_type == CardType::PAC {
-        connection::run_command(&app, &port, "lf t55xx write -b 0 -d 00080080").await?;
+        write_pac_override(&app, &port).await?;
         for (key, val) in &decoded {
             if let Some(n) = key.strip_prefix("t55xx_blk_") {
                 let cmd = format!("lf t55xx write -b {} -d {}", n, val);
@@ -140,8 +140,7 @@ pub async fn write_clone_with_data(
             let end = start + 8;
             if end <= hex.len() {
                 let chunk = &hex[start..end];
-                let cmd = format!("lf hitag wrbl --ht2 -p {} -d {} -k {}", page, chunk, key);
-                let _ = connection::run_command(&app, &port, &cmd).await;
+                let _ = write_hitag2_paxton(&app, &port, page, chunk, key).await;
             }
         }
         let mut m = machine.lock().map_err(|e| AppError::CommandFailed(format!("State lock poisoned: {}", e)))?;
@@ -866,3 +865,4 @@ pub async fn write_hitag2_paxton(
     let _ = connection::run_command(app, port, &cmd).await?;
     Ok(())
 }
+

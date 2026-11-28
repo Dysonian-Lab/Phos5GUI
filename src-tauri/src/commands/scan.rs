@@ -5,6 +5,7 @@ use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_shell::ShellExt;
 
 use crate::cards::types::{CardType, RecoveryAction};
+use crate::pm3::connection::get_dumps_dir;
 use crate::error::AppError;
 use crate::pm3::{command_builder, connection, output_parser};
 use crate::pm3::connection::HfOperationState;
@@ -42,7 +43,7 @@ pub async fn scan_card(
     };
 
     // Bootstrap dumps directory
-    let _ = std::fs::create_dir_all("dumps");
+    let _ = get_dumps_dir();
     hf_state.abort.store(false, Ordering::SeqCst);
 
     // Abort helper
@@ -175,11 +176,14 @@ pub async fn scan_card(
             }
             // Static LF handling: serialize to dumps/<uid>.json
             if card_type.frequency() == Frequency::LF && card_type != CardType::T55xx {
+                let dumps_dir = get_dumps_dir();
                 let filename = format!("{}.json", card_data.uid);
-                let path = format!("dumps/{}", filename);
+                let dump_path = dumps_dir.join(&filename);
                 if let Ok(json) = serde_json::to_string_pretty(&card_data) {
-                    let _ = std::fs::write(&path, json);
-                    card_data.dump_file = Some(filename);
+                    let _ = std::fs::write(&dump_path, json);
+                    if dump_path.exists() {
+                        card_data.dump_file = Some(dump_path.to_string_lossy().to_string());
+                    }
                 }
             }
             // HF enrichment
@@ -218,10 +222,18 @@ pub async fn scan_card(
                 // UL/NTAG auto-dump if unprotected
                 if card_type == CardType::MifareUltralight || card_type == CardType::NTAG {
                     if let Ok(out) = connection::run_command(&app, &port, &format!("hf mfu dump -f {}", card_data.uid)).await {
-                        if let Some(path) = output_parser::extract_dump_file_path(&out) {
-                            card_data.dump_file = Some(path);
+                        let dumps_dir = get_dumps_dir();
+                        if let Some(path_str) = output_parser::extract_dump_file_path(&out) {
+                            let p = std::path::PathBuf::from(&path_str);
+                            let canonical = if p.is_absolute() { p } else { dumps_dir.join(p) };
+                            if canonical.exists() {
+                                card_data.dump_file = Some(canonical.to_string_lossy().to_string());
+                            }
                         } else {
-                            card_data.dump_file = Some(format!("{}.bin", card_data.uid));
+                            let fallback = dumps_dir.join(format!("{}.bin", card_data.uid));
+                            if fallback.exists() {
+                                card_data.dump_file = Some(fallback.to_string_lossy().to_string());
+                            }
                         }
                     }
                 }
@@ -230,6 +242,9 @@ pub async fn scan_card(
             card_data.can_read = caps.can_read;
             card_data.can_write = caps.can_write;
             card_data.can_emulate = caps.can_emulate;
+            if card_data.recommended_blank.is_none() {
+                card_data.recommended_blank = Some(caps.recommended_blank);
+            }
             if !caps.can_write {
                 card_data.non_cloneable_reason = caps.write_reason.clone();
             }
@@ -421,8 +436,19 @@ pub async fn start_emulation(
     hf_state: State<'_, HfOperationState>,
 ) -> Result<(), AppError> {
     use crate::pm3::command_builder;
-    let dumps_dir = std::path::PathBuf::from("dumps");
-    let _ = std::fs::create_dir_all(&dumps_dir);
+    let dumps_dir = get_dumps_dir();
+
+    // Verify dump file existence before launching simulation
+    if let Some(ref dump) = card_data.dump_file {
+        let dump_path = if std::path::Path::new(dump).is_absolute() {
+            std::path::PathBuf::from(dump)
+        } else {
+            dumps_dir.join(dump)
+        };
+        if !dump_path.exists() {
+            return Err(AppError::CommandFailed(format!("Emulation dump file not found: {:?}", dump_path)));
+        }
+    }
 
     let cmd = match card_type {
         CardType::MifareClassic1K | CardType::MifareClassic4K | CardType::MifareClassicMini
@@ -487,19 +513,50 @@ pub async fn read_lf_memory_card(
     port: String,
     hf_state: State<'_, HfOperationState>,
 ) -> Result<String, AppError> {
-    let _ = std::fs::create_dir_all("dumps");
+    use crate::cards::types::Frequency;
     let uid = card_data.uid.clone();
-    let dumps_dir = std::path::PathBuf::from("dumps");
+    let dumps_dir = get_dumps_dir();
+
+    // Static LF bypass: never run a physical read; return serialized dump.
+    if card_type.frequency() == Frequency::LF
+        && card_type != CardType::T55xx
+        && card_type != CardType::EM4305
+        && card_type != CardType::Hitag2
+        && card_type != CardType::PaxtonNet2
+        && card_type != CardType::PaxtonSwitch2
+    {
+        if let Some(df) = &card_data.dump_file {
+            return Ok(df.clone());
+        }
+        let fallback = dumps_dir.join(format!("{}.json", uid));
+        if fallback.exists() {
+            return Ok(fallback.to_string_lossy().to_string());
+        }
+        return Err(AppError::CommandFailed("No serialized dump found".to_string()));
+    }
+
     match card_type {
         CardType::T55xx => {
             let cmd = format!("lf t55xx dump -f {}", uid);
             let _ = connection::run_command(&app, &port, &cmd).await?;
-            Ok(format!("{}.bin", uid))
+            let dump_file = format!("{}.bin", uid);
+            let path = dumps_dir.join(&dump_file);
+            if path.exists() {
+                Ok(dump_file)
+            } else {
+                Err(AppError::CommandFailed("T55xx dump file not written".to_string()))
+            }
         }
         CardType::EM4305 => {
             let cmd = format!("lf em 4x05 dump -f {}", uid);
             let _ = connection::run_command(&app, &port, &cmd).await?;
-            Ok(format!("{}.bin", uid))
+            let dump_file = format!("{}.bin", uid);
+            let path = dumps_dir.join(&dump_file);
+            if path.exists() {
+                Ok(dump_file)
+            } else {
+                Err(AppError::CommandFailed("EM4305 dump file not written".to_string()))
+            }
         }
         CardType::Hitag2 | CardType::PaxtonNet2 | CardType::PaxtonSwitch2 => {
             let key = match card_type {
@@ -514,9 +571,14 @@ pub async fn read_lf_memory_card(
                 "uid": uid,
                 "raw_output": out,
             });
-            let path = format!("dumps/{}.json", uid);
+            let dump_file = format!("{}.json", uid);
+            let path = dumps_dir.join(&dump_file);
             let _ = std::fs::write(&path, serde_json::to_string_pretty(&obj).unwrap_or_default());
-            Ok(format!("{}.json", uid))
+            if path.exists() {
+                Ok(dump_file)
+            } else {
+                Err(AppError::CommandFailed("Hitag dump file not written".to_string()))
+            }
         }
         _ => Err(AppError::CommandFailed("Not an LF memory card".to_string())),
     }
@@ -529,13 +591,24 @@ pub async fn read_iclass_card(
     port: String,
     card_data: crate::cards::types::CardData,
 ) -> Result<String, AppError> {
+    let dumps_dir = get_dumps_dir();
+    let uid = card_data.uid.clone();
     // Automated key trial sequence per plan
     let keys = ["--ki 0", "-k AEA684A6DAB23278", "-k 2020666666668888"];
     for k in keys {
         let cmd = format!("hf iclass dump {}", k);
         if connection::run_command(&app, &port, &cmd).await.is_ok() {
-            return Ok(card_data.uid.clone());
+            // verify dump file on disk
+            for ext in ["bin", "json", "eml"] {
+                let p = dumps_dir.join(format!("{}.{}", uid, ext));
+                if p.exists() {
+                    return Ok(p.to_string_lossy().to_string());
+                }
+            }
+            return Ok(uid.clone());
         }
     }
     Err(AppError::CommandFailed("KeyRequired".to_string()))
 }
+
+

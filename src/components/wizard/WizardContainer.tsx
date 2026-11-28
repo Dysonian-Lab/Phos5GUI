@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { ConnectStep } from './ConnectStep';
 import { ScanStep } from './ScanStep';
 import { BlankStep } from './BlankStep';
@@ -12,6 +14,7 @@ import { useWizard } from '../../hooks/useWizard';
 
 export function WizardContainer() {
   const wizard = useWizard();
+  const [isEmulating, setIsEmulating] = useState(false);
 
   const renderStep = () => {
     switch (wizard.currentStep) {
@@ -105,6 +108,40 @@ export function WizardContainer() {
               : () => wizard.skipToBlank(wizard.context.recommendedBlank!)
             }
             onBack={wizard.backToScan}
+            isEmulating={isEmulating}
+            onEmulate={() => {
+              if (!wizard.context.cardType || !wizard.context.cardData || !wizard.context.port) return;
+              invoke('start_emulation', {
+                cardType: wizard.context.cardType,
+                cardData: wizard.context.cardData,
+                port: wizard.context.port,
+              }).then(() => setIsEmulating(true)).catch(() => {});
+            }}
+            onStopEmulation={() => {
+              invoke('stop_emulation').catch(() => {});
+              setIsEmulating(false);
+            }}
+            onReadCrack={() => {
+              const t = wizard.context.cardType;
+              const mem = ['T55xx','EM4305','Hitag2','PaxtonNet2','PaxtonSwitch2'];
+              if (t && mem.includes(t) && wizard.context.cardData) {
+                invoke('read_lf_memory_card', {
+                  cardType: t,
+                  cardData: wizard.context.cardData,
+                  port: wizard.context.port,
+                }).catch(() => {});
+              } else {
+                wizard.startHfProcess();
+              }
+            }}
+            onRetryRead={() => {
+              if (wizard.context.port) {
+                invoke('read_iclass_card', {
+                  port: wizard.context.port,
+                  cardData: wizard.context.cardData,
+                }).catch(() => {});
+              }
+            }}
             onSave={async (name: string) => {
               const { saveCard } = await import('../../lib/api');
               await saveCard({

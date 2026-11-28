@@ -338,6 +338,7 @@ async fn execute_pm3(
             .shell()
             .command(scope_name)
             .args(["-p", port, "-f", "-c", cmd])
+            .current_dir({ let base_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf())).unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))); let dumps_dir = base_dir.join("dumps"); let _ = std::fs::create_dir_all(&dumps_dir); std::fs::canonicalize(&dumps_dir).unwrap_or(dumps_dir) })
             .output();
 
         // Note: When the timeout fires and the future is dropped, Tauri's shell plugin
@@ -1287,14 +1288,14 @@ fn spawn_pm3(
                 let binary_str = binary_path.to_string_lossy().into_owned();
                 #[cfg(target_os = "windows")]
                 {
-                    match app.shell().command(&binary_str).args(&args).spawn() {
+                    match app.shell().command(&binary_str).args(&args).current_dir(get_dumps_dir()).spawn() {
                         Ok(result) => return Ok(result),
                         Err(_) => {}
                     }
                 }
                 #[cfg(not(target_os = "windows"))]
                 {
-                    match app.shell().command(&binary_str).args(&args).spawn() {
+                    match app.shell().command(&binary_str).args(&args).current_dir(get_dumps_dir()).spawn() {
                         Ok(result) => return Ok(result),
                         Err(_) => {}
                     }
@@ -1307,7 +1308,7 @@ fn spawn_pm3(
     #[cfg(target_os = "windows")]
     {
         if let Ok(sidecar_cmd) = app.shell().sidecar("binaries/proxmark3") {
-            if let Ok(result) = sidecar_cmd.args(&args).spawn() {
+            if let Ok(result) = sidecar_cmd.args(&args).current_dir(get_dumps_dir()).spawn() {
                 return Ok(result);
             }
         }
@@ -1316,7 +1317,7 @@ fn spawn_pm3(
     #[cfg(not(target_os = "windows"))]
     {
         if let Ok(sidecar_cmd) = app.shell().sidecar("binaries/proxmark3") {
-            if let Ok(result) = sidecar_cmd.args(&args).spawn() {
+            if let Ok(result) = sidecar_cmd.args(&args).current_dir(get_dumps_dir()).spawn() {
                 return Ok(result);
             }
         }
@@ -1327,7 +1328,7 @@ fn spawn_pm3(
     let mut first_err: Option<String> = None;
 
     for scope_name in &scope_names {
-        match app.shell().command(scope_name).args(&args).spawn() {
+        match app.shell().command(scope_name).args(&args).current_dir(get_dumps_dir()).spawn() {
             Ok(result) => return Ok(result),
             Err(e) => {
                 if first_err.is_none() {
@@ -2578,4 +2579,14 @@ dump             Dump MIFARE Classic tag to binary file\n";
             );
         }
     }
+}
+
+pub fn get_dumps_dir() -> std::path::PathBuf {
+    let base_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")));
+    let dumps_dir = base_dir.join("dumps");
+    let _ = std::fs::create_dir_all(&dumps_dir);
+    std::fs::canonicalize(&dumps_dir).unwrap_or(dumps_dir)
 }
