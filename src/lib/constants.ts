@@ -43,6 +43,7 @@ export const STEP_LABELS: Record<WizardStepName, string> = {
   Complete: 'Clone successful',
   HfProcessing: 'Processing HF card...',
   HfDumpReady: 'Dump ready',
+  emulating: 'Emulating...',
   Error: 'Error',
 };
 
@@ -66,6 +67,7 @@ export const STEP_DESCRIPTIONS: Record<WizardStepName, string> = {
   Complete: 'The card has been cloned. You may remove it.',
   HfProcessing: 'Recovering encryption keys and dumping card memory.',
   HfDumpReady: 'Card data dumped. Swap to a blank magic card to write.',
+  emulating: 'Emulating tag...',
   Error: 'Something went wrong. See details below.',
 };
 

@@ -95,6 +95,7 @@ export function ScanStep({
   // Card has been identified -- show results
   if (cardData && cardType) {
     const freqLabel = frequency === 'LF' ? '125 kHz (LF)' : frequency === 'HF' ? '13.56 MHz (HF)' : 'Unknown';
+    const needsDump = Boolean(cardData?.can_read && !cardData?.dump_file);
     // Filter out fields already shown in the header (type, uid) to avoid duplication.
     // `t55xx_blk_<n>` keys are internal transport for the T55xx block-clone
     // write path -- the user sees a single BLOCKS count instead.
@@ -144,6 +145,11 @@ export function ScanStep({
           <div style={{ color: 'var(--green-dim)' }}>
             FREQ   : {freqLabel}
           </div>
+          {cardData.dump_file && (
+            <div style={{ color: 'var(--green-bright)', marginTop: '4px' }}>
+              [DUMP LOADED]
+            </div>
+          )}
           {decodedEntries.map(([key, value]) => (
             <div key={key} style={{ color: 'var(--green-dim)' }}>
               {key.toUpperCase().padEnd(7)}: {value}
@@ -253,7 +259,6 @@ export function ScanStep({
 
             {(() => {
               const hasDump = !!cardData.dump_file;
-              const canRead = cardData.can_read !== false;
               const isReadOnly = cardData.can_write === false;
               const isBlankT55 = cardType === 'T55xx' && !hasDump;
               if (isBlankT55) {
@@ -268,7 +273,7 @@ export function ScanStep({
                   </>
                 );
               }
-              if (!hasDump && canRead && !isReadOnly) {
+              if (needsDump) {
                 return (
                   <button
                     onClick={() => {

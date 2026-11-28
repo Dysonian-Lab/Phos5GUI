@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { ConnectStep } from './ConnectStep';
 import { ScanStep } from './ScanStep';
@@ -14,7 +13,7 @@ import { useWizard } from '../../hooks/useWizard';
 
 export function WizardContainer() {
   const wizard = useWizard();
-  const [isEmulating, setIsEmulating] = useState(false);
+  const isEmulating = wizard.currentStep === 'emulating';
 
   const renderStep = () => {
     switch (wizard.currentStep) {
@@ -115,11 +114,23 @@ export function WizardContainer() {
                 cardType: wizard.context.cardType,
                 cardData: wizard.context.cardData,
                 port: wizard.context.port,
-              }).then(() => setIsEmulating(true)).catch(() => {});
+              })
+                .then(() => {
+                  wizard.send({ type: 'START_EMULATION' });
+                })
+                .catch((err) => {
+                  console.error('Failed to start emulation:', err);
+                });
             }}
             onStopEmulation={() => {
-              invoke('stop_emulation').catch(() => {});
-              setIsEmulating(false);
+              invoke('stop_emulation')
+                .then(() => {
+                  wizard.send({ type: 'STOP_EMULATION' });
+                })
+                .catch((err) => {
+                  console.error('Failed to stop emulation:', err);
+                  wizard.send({ type: 'STOP_EMULATION' });
+                });
             }}
             onReadCrack={() => {
               const t = wizard.context.cardType;
@@ -160,6 +171,39 @@ export function WizardContainer() {
           />
         );
       }
+      case 'emulating':
+        return (
+          <ScanStep
+            device={{
+              model: wizard.context.model ?? 'Unknown',
+              port: wizard.context.port ?? '',
+              firmware: wizard.context.firmware ?? 'Unknown',
+            }}
+            cardData={wizard.context.cardData}
+            cardType={wizard.context.cardType}
+            frequency={wizard.context.frequency}
+            cloneable={wizard.context.cloneable}
+            skipSwapConfirm={true}
+            onScanned={() => {}}
+            onBack={wizard.backToScan}
+            isEmulating={true}
+            onEmulate={() => {}}
+            onStopEmulation={() => {
+              invoke('stop_emulation')
+                .then(() => {
+                  wizard.send({ type: 'STOP_EMULATION' });
+                })
+                .catch((err) => {
+                  console.error('Failed to stop emulation:', err);
+                  wizard.send({ type: 'STOP_EMULATION' });
+                });
+            }}
+            onReadCrack={() => {}}
+            onRetryRead={() => {}}
+            onSave={async () => {}}
+            isLoading={false}
+          />
+        );
       case 'HfProcessing':
         return (
           <HfProcessStep
@@ -179,7 +223,7 @@ export function WizardContainer() {
             keysTotal={wizard.context.hfKeysTotal}
             recommendedBlank={wizard.context.recommendedBlank}
             onWriteToBlank={(blank) => wizard.skipToBlank(blank)}
-            onBack={wizard.backToScan}
+            onBack={() => wizard.send({ type: 'VIEW_CARD_DETAILS', dumpFile: wizard.context.cardData?.dump_file })}
           />
         );
       case 'WaitingForBlank':

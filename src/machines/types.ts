@@ -190,7 +190,8 @@ export type WizardStepName = WizardState['step']
   | 'UpdatingFirmware'
   | 'RedetectingDevice'
   | 'HfProcessing'
-  | 'HfDumpReady';
+  | 'HfDumpReady'
+  | 'emulating';
 
 // Helper: extract data type for a given step
 export type StepData<S extends WizardStepName> = Extract<WizardState, { step: S }> extends { data: infer D } ? D : never;
