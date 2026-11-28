@@ -136,21 +136,34 @@ export function WizardContainer() {
               const t = wizard.context.cardType;
               const mem = ['T55xx','EM4305','Hitag2','PaxtonNet2','PaxtonSwitch2'];
               if (t && mem.includes(t) && wizard.context.cardData) {
-                invoke('read_lf_memory_card', {
+                invoke<string>('read_lf_memory_card', {
                   cardType: t,
                   cardData: wizard.context.cardData,
                   port: wizard.context.port,
-                }).catch(() => {});
+                })
+                  .then((dumpFile) => {
+                    wizard.send({ type: 'VIEW_CARD_DETAILS', dumpFile });
+                  })
+                  .catch((err) => {
+                    console.error('LF memory read failed:', err);
+                  });
               } else {
                 wizard.startHfProcess();
               }
             }}
-            onRetryRead={() => {
+            onRetryRead={(customKey?: string) => {
               if (wizard.context.port) {
-                invoke('read_iclass_card', {
+                invoke<string>('read_iclass_card', {
                   port: wizard.context.port,
                   cardData: wizard.context.cardData,
-                }).catch(() => {});
+                  customKey: customKey || null,
+                })
+                  .then((dumpFile) => {
+                    wizard.send({ type: 'VIEW_CARD_DETAILS', dumpFile });
+                  })
+                  .catch((err) => {
+                    console.error('iCLASS read failed:', err);
+                  });
               }
             }}
             onSave={async (name: string) => {
