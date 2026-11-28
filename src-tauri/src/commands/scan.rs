@@ -467,6 +467,68 @@ pub async fn start_emulation(
             let dump = card_data.dump_file.clone().unwrap_or_default();
             command_builder::build_hf_felica_sim(&dump)
         }
+        CardType::EM4100 => {
+            format!("lf em 410x sim --id {}", card_data.uid)
+        }
+        CardType::HIDProx => {
+            let val = if !card_data.raw.is_empty() { &card_data.raw } else { &card_data.uid };
+            format!("lf hid sim -r {}", val)
+        }
+        CardType::Indala => {
+            let val = if !card_data.raw.is_empty() { &card_data.raw } else { &card_data.uid };
+            format!("lf indala sim -r {}", val)
+        }
+        CardType::AWID => {
+            let val = if !card_data.raw.is_empty() { &card_data.raw } else { &card_data.uid };
+            format!("lf awid sim -r {}", val)
+        }
+        CardType::IOProx => {
+            let val = if !card_data.raw.is_empty() { &card_data.raw } else { &card_data.uid };
+            format!("lf io sim -r {}", val)
+        }
+        CardType::Pyramid => {
+            let val = if !card_data.raw.is_empty() { &card_data.raw } else { &card_data.uid };
+            format!("lf pyramid sim -r {}", val)
+        }
+        CardType::Viking => {
+            let val = if !card_data.raw.is_empty() { &card_data.raw } else { &card_data.uid };
+            format!("lf viking sim -r {}", val)
+        }
+        CardType::Gallagher => {
+            let val = if !card_data.raw.is_empty() { &card_data.raw } else { &card_data.uid };
+            format!("lf gallagher sim -r {}", val)
+        }
+        CardType::Paradox => {
+            let val = if !card_data.raw.is_empty() { &card_data.raw } else { &card_data.uid };
+            format!("lf paradox sim -r {}", val)
+        }
+        CardType::SecuraKey => {
+            let val = if !card_data.raw.is_empty() { &card_data.raw } else { &card_data.uid };
+            format!("lf securakey sim -r {}", val)
+        }
+        CardType::Jablotron => {
+            let val = if !card_data.raw.is_empty() { &card_data.raw } else { &card_data.uid };
+            format!("lf jablotron sim -r {}", val)
+        }
+        CardType::Noralsy => {
+            let val = if !card_data.raw.is_empty() { &card_data.raw } else { &card_data.uid };
+            format!("lf noralsy sim -r {}", val)
+        }
+        CardType::Presco => {
+            let val = if !card_data.raw.is_empty() { &card_data.raw } else { &card_data.uid };
+            format!("lf presco sim -r {}", val)
+        }
+        CardType::Visa2000 => {
+            let val = if !card_data.raw.is_empty() { &card_data.raw } else { &card_data.uid };
+            format!("lf visa2000 sim -r {}", val)
+        }
+        CardType::NexWatch => {
+            let val = if !card_data.raw.is_empty() { &card_data.raw } else { &card_data.uid };
+            format!("lf nexwatch sim -r {}", val)
+        }
+        CardType::T55xx | CardType::EM4305 => {
+            return Err(AppError::CommandFailed("Emulation not supported directly for raw T5577/EM4305 chips. Clone to a physical blank tag instead.".to_string()));
+        }
         _ => {
             return Err(AppError::CommandFailed("Emulation not supported for this card type".to_string()));
         }
